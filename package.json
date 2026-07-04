@@ -1,0 +1,12 @@
+{
+  "name": "truckmanagement-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "bootstrap": "npm install",
+    "start:api": "npm --workspace=apps/api run start:dev"
+  }
+}

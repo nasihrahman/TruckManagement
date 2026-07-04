@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id           String         @id @default(cuid())
+  name         String
+  createdAt    DateTime       @default(now())
+  users        User[]
+  trucks       Truck[]
+  trips        Trip[]
+  documents    Document[]
+  fuelReceipts FuelReceipt[]
+  expenses     Expense[]
+  maintenance  MaintenanceRecord[]
+  issues       Issue[]
+  notifications Notification[]
+  reports      Report[]
+}
+
+model User {
+  id                      String   @id @default(cuid())
+  company                 Company  @relation(fields: [companyId], references: [id])
+  companyId               String
+  email                   String   @unique
+  password                String
+  currentHashedRefreshToken String?
+  role                    Role
+  firstName               String?
+  lastName                String?
+  createdAt               DateTime @default(now())
+  trips                   Trip[]
+}
+
+enum Role {
+  OWNER
+  DRIVER
+}
+
+model Truck {
+  id          String              @id @default(cuid())
+  company     Company             @relation(fields: [companyId], references: [id])
+  companyId   String
+  plate       String              @unique
+  vin         String?
+  createdAt   DateTime            @default(now())
+  maintenance MaintenanceRecord[]
+  trips       Trip[]
+}
+
+model Trip {
+  id            String        @id @default(cuid())
+  company       Company       @relation(fields: [companyId], references: [id])
+  companyId     String
+  truck         Truck?        @relation(fields: [truckId], references: [id])
+  truckId       String?
+  driver        User?         @relation(fields: [driverId], references: [id])
+  driverId      String?
+  origin        String
+  destination   String
+  status        TripStatus    @default(ASSIGNED)
+  freightAmount Decimal?      @db.Decimal(10,2)
+  scheduledAt   DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  fuelReceipts  FuelReceipt[]
+  expenses      Expense[]
+  issues        Issue[]
+}
+
+enum TripStatus {
+  ASSIGNED
+  IN_TRANSIT
+  DELIVERED
+  FAILED
+}
+
+model FuelReceipt {
+  id        String   @id @default(cuid())
+  company   Company  @relation(fields: [companyId], references: [id])
+  companyId String
+  trip      Trip?    @relation(fields: [tripId], references: [id])
+  tripId    String?
+  amount    Decimal  @db.Decimal(10,2)
+  photoUrl  String?
+  createdAt DateTime @default(now())
+}
+
+model Expense {
+  id        String   @id @default(cuid())
+  company   Company  @relation(fields: [companyId], references: [id])
+  companyId String
+  trip      Trip?    @relation(fields: [tripId], references: [id])
+  tripId    String?
+  category  String
+  amount    Decimal  @db.Decimal(10,2)
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model MaintenanceRecord {
+  id          String   @id @default(cuid())
+  company     Company  @relation(fields: [companyId], references: [id])
+  companyId   String
+  truck       Truck    @relation(fields: [truckId], references: [id])
+  truckId     String
+  type        String
+  cost        Decimal  @db.Decimal(10,2)
+  date        DateTime
+  nextDueDate DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model Document {
+  id        String    @id @default(cuid())
+  company   Company   @relation(fields: [companyId], references: [id])
+  companyId String
+  ownerId   String?
+  ownerType String?
+  fileUrl   String
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model Issue {
+  id          String   @id @default(cuid())
+  company     Company  @relation(fields: [companyId], references: [id])
+  companyId   String
+  trip        Trip?    @relation(fields: [tripId], references: [id])
+  tripId      String?
+  reportedBy  String?
+  type        String
+  description String
+  resolved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  company   Company  @relation(fields: [companyId], references: [id])
+  companyId String
+  userId    String?
+  title     String
+  body      String
+  data      Json?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  company     Company  @relation(fields: [companyId], references: [id])
+  companyId   String
+  type        String
+  params      Json
+  fileUrl     String?
+  generatedAt DateTime @default(now())
+}
