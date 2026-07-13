@@ -22,7 +22,7 @@ export class TripsController {
   @Get()
   async list(@Request() req: any) {
     const companyId = req.user.companyId;
-    return this.tripsService.findByCompany(companyId);
+    return this.tripsService.findByCompany(companyId, req.user.userId, req.user.role);
   }
 
   @Get(':id')

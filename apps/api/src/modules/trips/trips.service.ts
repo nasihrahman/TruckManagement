@@ -10,7 +10,10 @@ export class TripsService {
     return this.tripsRepository.create({ ...payload, companyId });
   }
 
-  async findByCompany(companyId: string): Promise<Trip[]> {
+  async findByCompany(companyId: string, userId?: string, role?: string): Promise<Trip[]> {
+    if (role === 'DRIVER' && userId) {
+      return this.tripsRepository.findByCompanyAndDriver(companyId, userId);
+    }
     return this.tripsRepository.findByCompany(companyId);
   }
 

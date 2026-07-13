@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'trips_screen.dart';
 import 'change_password_screen.dart';
+import 'driver_trips_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.apiService});
@@ -34,16 +35,24 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       } else {
         // Pass role to the next screen or store it in a session manager
-        // For now, we'll continue to TripsScreen but the app should use the role to show/hide Owner features.
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => TripsScreen(
-              apiService: widget.apiService,
-              userRole: loginResult['role'],
+        if (loginResult['role'] == 'DRIVER') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const DriverTripsScreen(apiService: widget.apiService),
             ),
-          ),
-        );
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => TripsScreen(
+                apiService: widget.apiService,
+                userRole: loginResult['role'],
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (!mounted) return;
