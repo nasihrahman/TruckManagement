@@ -36,11 +36,7 @@ describe('AuthController (e2e)', () => {
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
-    app.setGlobalPrefix('api');
-    app.enableVersioning({
-        type: VersioningType.URI,
-        defaultVersion: '1',
-    });
+    app.setGlobalPrefix('api/v1');
     app.useGlobalPipes(
       new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
     );
@@ -55,7 +51,8 @@ describe('AuthController (e2e)', () => {
   it('registers, logs in, and refreshes tokens', async () => {
     const testUser = {
       email: 'owner@example.com',
-      password: 'SecurePass123!',
+      password: 'SuperUser123!',
+      phone: '+1234567890',
       companyName: 'Test Fleet',
     };
 
@@ -70,7 +67,7 @@ describe('AuthController (e2e)', () => {
 
     const loginResponse = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
-        .send({ email: testUser.email, password: testUser.password })
+        .send({ emailOrPhone: testUser.email, password: testUser.password })
         .expect(201);
     expect(loginResponse.body).toHaveProperty('accessToken');
     expect(loginResponse.body).toHaveProperty('refreshToken');
@@ -82,5 +79,5 @@ describe('AuthController (e2e)', () => {
 
     expect(refreshResponse.body).toHaveProperty('accessToken');
     expect(refreshResponse.body).toHaveProperty('refreshToken');
-  });
-});
+    });
+    });

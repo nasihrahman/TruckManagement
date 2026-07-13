@@ -10,6 +10,10 @@ export class UsersRepository {
     return this.prisma.user.findUnique({ where: { email } });
   }
 
+  async findByPhone(phone: string): Promise<User | null> {
+    return this.prisma.user.findUnique({ where: { phone } });
+  }
+
   async findById(id: string): Promise<User | null> {
     return this.prisma.user.findUnique({ where: { id } });
   }
@@ -18,6 +22,7 @@ export class UsersRepository {
     companyName: string;
     email: string;
     password: string;
+    phone: string;
     firstName?: string;
     lastName?: string;
   }): Promise<User> {
@@ -25,6 +30,7 @@ export class UsersRepository {
       data: {
         email: input.email,
         password: input.password,
+        phone: input.phone,
         role: Role.OWNER,
         firstName: input.firstName,
         lastName: input.lastName,
@@ -44,10 +50,10 @@ export class UsersRepository {
     });
   }
 
-  async removeRefreshToken(userId: string): Promise<User> {
+  async updatePassword(userId: string, hashedPassword: string): Promise<User> {
     return this.prisma.user.update({
       where: { id: userId },
-      data: { currentHashedRefreshToken: null },
+      data: { password: hashedPassword, mustChangePassword: false },
     });
   }
 }

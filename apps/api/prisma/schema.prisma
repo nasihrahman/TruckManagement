@@ -27,14 +27,26 @@ model User {
   id                      String   @id @default(cuid())
   company                 Company  @relation(fields: [companyId], references: [id])
   companyId               String
-  email                   String   @unique
+  email                   String?  @unique
   password                String
   currentHashedRefreshToken String?
   role                    Role
   firstName               String?
   lastName                String?
+  phone                   String   @unique
+  isActive                Boolean  @default(true)
+  mustChangePassword      Boolean  @default(false)
   createdAt               DateTime @default(now())
   trips                   Trip[]
+  driverProfile           DriverProfile?
+}
+
+model DriverProfile {
+  id            String   @id @default(cuid())
+  user          User     @relation(fields: [userId], references: [id])
+  userId        String   @unique
+  licenseNumber String?
+  updatedAt     DateTime @updatedAt
 }
 
 enum Role {

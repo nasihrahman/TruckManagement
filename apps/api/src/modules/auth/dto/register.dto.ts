@@ -9,6 +9,11 @@ export class RegisterDto {
   @Length(8, 128)
   password!: string;
 
+  @IsNotEmpty()
+  @IsString()
+  @Length(10, 15)
+  phone!: string;
+
   @IsOptional()
   @IsString()
   firstName?: string;
@@ -17,7 +22,7 @@ export class RegisterDto {
   @IsString()
   lastName?: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  companyName?: string;
+  companyName!: string;
 }

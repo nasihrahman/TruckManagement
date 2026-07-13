@@ -1,0 +1,19 @@
+name: truck_management_mobile
+description: Flutter UI for Truck Management System.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.12
+  flutter_dotenv: ^5.1.0
+  shared_preferences: 2.5.5
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env

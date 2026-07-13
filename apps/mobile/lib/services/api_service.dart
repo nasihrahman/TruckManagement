@@ -1,0 +1,197 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/trip.dart';
+import '../models/driver.dart';
+
+class ApiService {
+  ApiService({required this.baseUrl});
+
+  final String baseUrl;
+  String? _token;
+
+  Future<void> _loadToken() async {
+    if (_token != null) return;
+    final prefs = await SharedPreferences.getInstance();
+    _token = prefs.getString('auth_token');
+  }
+
+  Future<void> saveToken(String token) async {
+    _token = token;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_token', token);
+  }
+
+  Future<void> clearToken() async {
+    _token = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+  }
+
+  Future<Map<String, String>> _headers({bool auth = false}) async {
+    if (auth) {
+      await _loadToken();
+    }
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (auth && _token != null) {
+      headers['Authorization'] = 'Bearer $_token';
+    }
+    return headers;
+  }
+
+  Future<Map<String, dynamic>> login({required String email, required String password}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/login'),
+      headers: await _headers(),
+      body: jsonEncode({'emailOrPhone': email, 'password': password}),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Login failed');
+    }
+    await saveToken(body['accessToken']);
+    return body;
+  }
+
+  Future<List<Trip>> fetchTrips() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/trips'),
+      headers: await _headers(auth: true),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(data['message'] ?? 'Unable to fetch trips');
+    }
+    if (data is List) {
+      return data.map((item) => Trip.fromJson(item as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  Future<Trip> createTrip({required String origin, required String destination}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/trips'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({'origin': origin, 'destination': destination}),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Unable to create trip');
+    }
+    return Trip.fromJson(body);
+  }
+
+  Future<void> assignTrip(String tripId, {String? driverId, String? truckId}) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/trips/$tripId/assign'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({
+        if (driverId != null) 'driverId': driverId,
+        if (truckId != null) 'truckId': truckId,
+      }),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Failed to assign trip');
+    }
+  }
+
+  Future<Trip> updateTripStatus(String tripId, String status) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/trips/$tripId/status'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({'status': status}),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Failed to update trip status');
+    }
+    return Trip.fromJson(body);
+  }
+
+  Future<List<Driver>> fetchDrivers() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/drivers'),
+      headers: await _headers(auth: true),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(data['message'] ?? 'Unable to fetch drivers');
+    }
+    if (data is List) {
+      return data.map((item) => Driver.fromJson(item as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  Future<List<Map<String, dynamic>>> fetchTrucks() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/trucks'),
+      headers: await _headers(auth: true),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(data['message'] ?? 'Unable to fetch trucks');
+    }
+    if (data is List) {
+      return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>> createDriver({
+    required String name,
+    required String phone,
+    String? email,
+    String? licenseNumber,
+    String? initialPassword,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/drivers'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({
+        'name': name,
+        'phone': phone,
+        'email': email,
+        'licenseNumber': licenseNumber,
+        'initialPassword': initialPassword,
+      }),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Unable to create driver');
+    }
+    return body;
+  }
+
+  Future<void> deactivateDriver(String id) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/drivers/$id/deactivate'),
+      headers: await _headers(auth: true),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception('Failed to deactivate driver');
+    }
+  }
+
+  Future<void> reactivateDriver(String id) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/drivers/$id/reactivate'),
+      headers: await _headers(auth: true),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception('Failed to reactivate driver');
+    }
+  }
+
+  Future<void> changePassword(String newPassword) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/change-password'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({'newPassword': newPassword}),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception('Failed to change password');
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { TripsRepository } from './trips.repository';
 import { Trip, TripStatus, Prisma } from '@prisma/client';
 
@@ -23,6 +23,17 @@ export class TripsService {
   async assign(id: string, companyId: string, data: { truckId?: string; driverId?: string }) {
     const trip = await this.findById(id);
     if (trip.companyId !== companyId) throw new ForbiddenException();
+
+    if (data.driverId) {
+      const isBusy = await this.tripsRepository.isResourceBusy(data.driverId, 'driver');
+      if (isBusy) throw new BadRequestException('This driver is currently on an active trip');
+    }
+
+    if (data.truckId) {
+      const isBusy = await this.tripsRepository.isResourceBusy(data.truckId, 'truck');
+      if (isBusy) throw new BadRequestException('This truck is currently on an active trip');
+    }
+
     return this.tripsRepository.update(id, { truckId: data.truckId, driverId: data.driverId });
   }
 
@@ -32,6 +43,17 @@ export class TripsService {
 
     if (user.role === 'DRIVER') {
       if (!trip.driverId || trip.driverId !== user.userId) throw new ForbiddenException('Driver not assigned to this trip');
+    }
+
+    // Validate state transition
+    if (status === 'IN_TRANSIT' && trip.status !== 'ASSIGNED') {
+      throw new BadRequestException('Trip must be ASSIGNED before starting');
+    }
+    if ((status === 'DELIVERED' || status === 'FAILED') && trip.status !== 'IN_TRANSIT') {
+      throw new BadRequestException('Trip must be IN_TRANSIT before completing');
+    }
+    if (trip.status === status) {
+      throw new BadRequestException(`Trip is already ${status}`);
     }
 
     return this.tripsRepository.updateStatus(id, status);

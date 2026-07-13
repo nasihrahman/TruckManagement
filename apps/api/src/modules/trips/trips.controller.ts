@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards, NotFoundException } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
@@ -28,7 +28,9 @@ export class TripsController {
   @Get(':id')
   async get(@Request() req: any, @Param('id') id: string) {
     const trip = await this.tripsService.findById(id);
-    if (trip.companyId !== req.user.companyId) return { status: 404 };
+    if (trip.companyId !== req.user.companyId) {
+      throw new NotFoundException('Trip not found');
+    }
     return trip;
   }
 

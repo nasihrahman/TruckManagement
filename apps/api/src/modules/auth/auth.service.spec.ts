@@ -61,6 +61,7 @@ describe('AuthService', () => {
     const result = await service.register({
       email: 'owner@example.com',
       password: 'securepassword',
+      phone: '+1234567890',
       companyName: 'Acme Fleet',
     });
 
@@ -77,6 +78,7 @@ describe('AuthService', () => {
       role: 'OWNER',
       companyId: 'company-1',
       password: hashedPassword,
+      isActive: true,
     } as any;
 
     (usersService.findByEmail as jest.Mock).mockResolvedValue(user);

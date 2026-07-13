@@ -49,16 +49,29 @@ describe('Trips (e2e)', () => {
 
   it('owner creates trip and driver updates status', async () => {
     // register owner
-    const owner = { email: 'owner2@example.com', password: 'SecurePass123!', companyName: 'FleetX' };
+    const owner = { 
+      email: 'owner2@example.com', 
+      password: 'SecurePass123!', 
+      phone: '+1111111111', 
+      companyName: 'FleetX' 
+    };
     const reg = await request(app.getHttpServer()).post('/api/v1/auth/register').send(owner).expect(201);
     const ownerToken = reg.body.accessToken;
 
     // find companyId and create driver and truck
     const ownerUser = await prisma.user.findUnique({ where: { email: owner.email } });
-    const companyId = ownerUser!.companyId;
+    const companyId = ownerUser!.companyId!;
 
     const hashed = await bcrypt.hash('driverpass', 10);
-    const driver = await prisma.user.create({ data: { email: 'driver1@example.com', password: hashed, role: 'DRIVER', companyId } });
+    const driver = await prisma.user.create({ 
+      data: { 
+        email: 'driver1@example.com', 
+        phone: '+2222222222', 
+        password: hashed, 
+        role: 'DRIVER', 
+        companyId 
+      } 
+    });
     const truck = await prisma.truck.create({ data: { companyId, plate: 'TRUCK-1' } });
 
     // owner creates trip
@@ -79,7 +92,7 @@ describe('Trips (e2e)', () => {
 
     // driver login via direct token creation (signing not needed for test, use JWT with payload)
     // Use auth.login endpoint by creating password match: but easier to generate token via API login
-    const login = await request(app.getHttpServer()).post('/api/v1/auth/login').send({ email: driver.email, password: 'driverpass' }).expect(201);
+    const login = await request(app.getHttpServer()).post('/api/v1/auth/login').send({ emailOrPhone: driver.email, password: 'driverpass' }).expect(201);
     const driverToken = login.body.accessToken;
 
     // driver updates status to IN_TRANSIT

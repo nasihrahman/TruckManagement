@@ -16,6 +16,7 @@ export class AuthService {
   async register(payload: {
     email: string;
     password: string;
+    phone: string;
     firstName?: string;
     lastName?: string;
     companyName?: string;
@@ -29,19 +30,24 @@ export class AuthService {
     const user = await this.usersService.createOwner({
       email: payload.email,
       password: hashedPassword,
+      phone: payload.phone,
       firstName: payload.firstName,
       lastName: payload.lastName,
       companyName: payload.companyName ?? `${payload.email}-company`,
     });
 
-    const tokens = await this.getTokens(user.id, user.email, user.role, user.companyId);
+    const tokens = await this.getTokens(user.id, user.email || user.phone, user.role, user.companyId);
     await this.usersService.setCurrentRefreshToken(user.id, await bcrypt.hash(tokens.refreshToken, 10));
     return tokens;
   }
 
-  async login(email: string, password: string): Promise<AuthResponseDto> {
-    const user = await this.usersService.findByEmail(email);
+  async login(emailOrPhone: string, password: string): Promise<AuthResponseDto> {
+    // Try email first, then phone
+    let user = await this.usersService.findByEmail(emailOrPhone);
     if (!user) {
+      user = await this.usersService.findByPhone(emailOrPhone);
+    }
+    if (!user || !user.isActive) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -50,10 +56,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const tokens = await this.getTokens(user.id, user.email, user.role, user.companyId);
+    const tokens = await this.getTokens(user.id, user.email || user.phone, user.role, user.companyId);
     await this.usersService.setCurrentRefreshToken(user.id, await bcrypt.hash(tokens.refreshToken, 10));
 
-    return tokens;
+    return { ...tokens, mustChangePassword: user.mustChangePassword, role: user.role };
   }
 
   async refresh(refreshToken: string): Promise<AuthResponseDto> {
@@ -72,7 +78,7 @@ export class AuthService {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
-      const tokens = await this.getTokens(user.id, user.email, user.role, user.companyId);
+      const tokens = await this.getTokens(user.id, user.email || user.phone, user.role, user.companyId);
       await this.usersService.setCurrentRefreshToken(user.id, await bcrypt.hash(tokens.refreshToken, 10));
       return tokens;
     } catch (error) {
@@ -80,12 +86,19 @@ export class AuthService {
     }
   }
 
+  async changePassword(userId: string, newPassword: string): Promise<void> {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.usersService.updatePassword(userId, hashedPassword);
+  }
+
   private async getTokens(userId: string, email: string, role: string, companyId: string): Promise<AuthResponseDto> {
+    const secret = this.configService.get<string>('JWT_ACCESS_SECRET');
+    console.log('AuthService signing token with secret:', secret);
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(
         { sub: userId, email, role, companyId },
         {
-          secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
+          secret: secret,
           expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRATION', '15m'),
         },
       ),

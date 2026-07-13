@@ -1,8 +1,9 @@
-import { IsEmail, IsNotEmpty, Length } from 'class-validator';
+import { IsNotEmpty, Length, ValidateIf, IsEmail } from 'class-validator';
 
 export class LoginDto {
-  @IsEmail()
-  email!: string;
+  @IsNotEmpty()
+  @Length(5, 255)
+  emailOrPhone!: string;
 
   @IsNotEmpty()
   @Length(8, 128)

@@ -10,6 +10,10 @@ export class UsersService {
     return this.usersRepository.findByEmail(email);
   }
 
+  async findByPhone(phone: string): Promise<User | null> {
+    return this.usersRepository.findByPhone(phone);
+  }
+
   async findById(id: string): Promise<User | null> {
     return this.usersRepository.findById(id);
   }
@@ -18,6 +22,7 @@ export class UsersService {
     companyName: string;
     email: string;
     password: string;
+    phone: string;
     firstName?: string;
     lastName?: string;
   }): Promise<User> {
@@ -28,7 +33,7 @@ export class UsersService {
     return this.usersRepository.updateRefreshToken(userId, hashedToken);
   }
 
-  async removeRefreshToken(userId: string): Promise<User> {
-    return this.usersRepository.removeRefreshToken(userId);
+  async updatePassword(userId: string, hashedPassword: string): Promise<User> {
+    return this.usersRepository.updatePassword(userId, hashedPassword);
   }
 }

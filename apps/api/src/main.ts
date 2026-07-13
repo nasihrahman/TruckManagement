@@ -15,18 +15,14 @@ async function bootstrap() {
     }),
   );
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.use(
-    '/api/v1/auth',
-    rateLimit({
-      windowMs: 60_000,
-      max: 10,
-      standardHeaders: true,
-      legacyHeaders: false,
-    }),
-  );
 
+  app.enableCors({
+    origin: '*', // Allows requests from any frontend port
+    credentials: true,
+  });
+  
   await app.listen(3000);
-  console.log('API listening on http://localhost:3000/api/v1');
+  console.log(`API listening on http://localhost:3000/api/v1`);
 }
 
 bootstrap();
