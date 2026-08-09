@@ -12,6 +12,7 @@ describe('Trips (e2e)', () => {
   let app: INestApplication;
   let postgresContainer: any;
   let prisma: PrismaClient;
+  const originalDatabaseUrl = process.env.DATABASE_URL;
 
   beforeAll(async () => {
     postgresContainer = await new GenericContainer('postgres:15')
@@ -45,6 +46,7 @@ describe('Trips (e2e)', () => {
     if (app) await app.close();
     if (postgresContainer) await postgresContainer.stop();
     await prisma.$disconnect();
+    process.env.DATABASE_URL = originalDatabaseUrl;
   });
 
   it('owner creates trip and driver updates status', async () => {

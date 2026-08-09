@@ -9,6 +9,7 @@ import path from 'path';
 describe('AuthController (e2e)', () => {
   let app: INestApplication;
   let postgresContainer: any;
+  const originalDatabaseUrl = process.env.DATABASE_URL;
 
   beforeAll(async () => {
     postgresContainer = await new GenericContainer('postgres:15')
@@ -46,6 +47,7 @@ describe('AuthController (e2e)', () => {
   afterAll(async () => {
     if (app) await app.close();
     if (postgresContainer) await postgresContainer.stop();
+    process.env.DATABASE_URL = originalDatabaseUrl;
   });
 
   it('registers, logs in, and refreshes tokens', async () => {

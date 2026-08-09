@@ -3,19 +3,42 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { GenericContainer } from 'testcontainers';
+import { execSync } from 'child_process';
+import path from 'path';
 
 describe('Drivers (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let postgresContainer: any;
   let ownerToken: string;
   let ownerUserId: string;
   let companyId: string;
+  const originalDatabaseUrl = process.env.DATABASE_URL;
 
   beforeAll(async () => {
+    postgresContainer = await new GenericContainer('postgres:15')
+      .withEnvironment({
+        POSTGRES_USER: 'postgres',
+        POSTGRES_PASSWORD: 'postgres',
+        POSTGRES_DB: 'truckmanagement_test',
+      })
+      .withExposedPorts(5432)
+      .start();
+
+    const port = postgresContainer.getMappedPort(5432);
+    const host = postgresContainer.getHost();
+    process.env.DATABASE_URL = `postgresql://postgres:postgres@${host}:${port}/truckmanagement_test?schema=public`;
     process.env.JWT_ACCESS_SECRET = 'test-access-secret';
     process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
     process.env.JWT_ACCESS_EXPIRATION = '15m';
     process.env.JWT_REFRESH_EXPIRATION = '7d';
+
+    execSync('npx prisma db push', {
+      cwd: path.join(__dirname, '..'),
+      stdio: 'inherit',
+      env: { ...process.env },
+    });
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -29,10 +52,12 @@ describe('Drivers (e2e)', () => {
     await app.init();
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
-  });
+  }, 60000);
 
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
+    if (postgresContainer) await postgresContainer.stop();
+    process.env.DATABASE_URL = originalDatabaseUrl;
   });
 
   beforeEach(async () => {
@@ -42,7 +67,8 @@ describe('Drivers (e2e)', () => {
     await prisma.expense.deleteMany({});
     await prisma.issue.deleteMany({});
     await prisma.notification.deleteMany({});
-    await prisma.report.deleteMany({});
+    await prisma.locationPing.deleteMany({});
+    await prisma.driverShift.deleteMany({});
     await prisma.document.deleteMany({});
     await prisma.maintenanceRecord.deleteMany({});
     await prisma.trip.deleteMany({});
