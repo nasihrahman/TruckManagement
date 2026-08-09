@@ -8,5 +8,6 @@ import { TripsController } from './trips.controller';
   imports: [PrismaModule],
   providers: [TripsRepository, TripsService],
   controllers: [TripsController],
+  exports: [TripsRepository],
 })
 export class TripsModule {}

@@ -5,6 +5,7 @@ class Trip {
   final String status;
   final String? truckId;
   final String? driverId;
+  final bool financiallyClosed;
 
   Trip({
     required this.id,
@@ -13,6 +14,7 @@ class Trip {
     required this.status,
     this.truckId,
     this.driverId,
+    this.financiallyClosed = false,
   });
 
   factory Trip.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class Trip {
       status: json['status']?.toString() ?? 'PENDING',
       truckId: json['truckId']?.toString(),
       driverId: json['driverId']?.toString(),
+      financiallyClosed: json['financiallyClosed'] == true,
     );
   }
 }

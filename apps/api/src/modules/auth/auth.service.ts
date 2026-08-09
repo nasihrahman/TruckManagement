@@ -93,7 +93,6 @@ export class AuthService {
 
   private async getTokens(userId: string, email: string, role: string, companyId: string): Promise<AuthResponseDto> {
     const secret = this.configService.get<string>('JWT_ACCESS_SECRET');
-    console.log('AuthService signing token with secret:', secret);
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(
         { sub: userId, email, role, companyId },

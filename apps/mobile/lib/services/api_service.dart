@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/trip.dart';
 import '../models/driver.dart';
+import '../models/expense.dart';
 
 class ApiService {
   ApiService({required this.baseUrl});
@@ -184,6 +185,28 @@ class ApiService {
     }
   }
 
+  Future<void> goOnline() async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/drivers/me/go-online'),
+      headers: await _headers(auth: true),
+    );
+    if (response.statusCode >= 400) {
+      final body = jsonDecode(response.body);
+      throw Exception(body['message'] ?? 'Failed to go online');
+    }
+  }
+
+  Future<void> goOffline() async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/drivers/me/go-offline'),
+      headers: await _headers(auth: true),
+    );
+    if (response.statusCode >= 400) {
+      final body = jsonDecode(response.body);
+      throw Exception(body['message'] ?? 'Failed to go offline');
+    }
+  }
+
   Future<void> changePassword(String newPassword) async {
     final response = await http.post(
       Uri.parse('$baseUrl/auth/change-password'),
@@ -191,7 +214,87 @@ class ApiService {
       body: jsonEncode({'newPassword': newPassword}),
     );
     if (response.statusCode >= 400) {
-      throw Exception('Failed to change password');
+      final body = jsonDecode(response.body);
+      throw Exception(body['message'] ?? 'Failed to update password');
+    }
+  }
+
+  Future<List<Expense>> fetchExpenses(String tripId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/trips/$tripId/expenses'),
+      headers: await _headers(auth: true),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(data['message'] ?? 'Unable to fetch expenses');
+    }
+    if (data is List) {
+      return data.map((item) => Expense.fromJson(item as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  Future<Expense> createExpense(
+    String tripId, {
+    required ExpenseCategory category,
+    required double amount,
+    int? odometer,
+    String? reason,
+    String? notes,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/trips/$tripId/expenses'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({
+        'category': expenseCategoryToJson(category),
+        'amount': amount,
+        if (odometer != null) 'odometer': odometer,
+        if (reason != null && reason.isNotEmpty) 'reason': reason,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      }),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Failed to log expense');
+    }
+    return Expense.fromJson(body);
+  }
+
+  Future<Expense> updateExpense(
+    String tripId,
+    String expenseId, {
+    required ExpenseCategory category,
+    required double amount,
+    int? odometer,
+    String? reason,
+    String? notes,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/trips/$tripId/expenses/$expenseId'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({
+        'category': expenseCategoryToJson(category),
+        'amount': amount,
+        'odometer': odometer,
+        'reason': reason,
+        'notes': notes,
+      }),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Failed to update expense');
+    }
+    return Expense.fromJson(body);
+  }
+
+  Future<void> deleteExpense(String tripId, String expenseId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/trips/$tripId/expenses/$expenseId'),
+      headers: await _headers(auth: true),
+    );
+    if (response.statusCode >= 400) {
+      final body = jsonDecode(response.body);
+      throw Exception(body['message'] ?? 'Failed to delete expense');
     }
   }
 }

@@ -7,6 +7,16 @@ export class TripsService {
   constructor(private readonly tripsRepository: TripsRepository) {}
 
   async create(companyId: string, payload: Prisma.TripUncheckedCreateInput): Promise<Trip> {
+    if (payload.driverId) {
+      const isBusy = await this.tripsRepository.isResourceBusy(payload.driverId as string, 'driver');
+      if (isBusy) throw new BadRequestException('This driver is currently on an active trip');
+    }
+
+    if (payload.truckId) {
+      const isBusy = await this.tripsRepository.isResourceBusy(payload.truckId as string, 'truck');
+      if (isBusy) throw new BadRequestException('This truck is currently on an active trip');
+    }
+
     return this.tripsRepository.create({ ...payload, companyId });
   }
 
@@ -28,12 +38,12 @@ export class TripsService {
     if (trip.companyId !== companyId) throw new ForbiddenException();
 
     if (data.driverId) {
-      const isBusy = await this.tripsRepository.isResourceBusy(data.driverId, 'driver');
+      const isBusy = await this.tripsRepository.isResourceBusy(data.driverId, 'driver', id);
       if (isBusy) throw new BadRequestException('This driver is currently on an active trip');
     }
 
     if (data.truckId) {
-      const isBusy = await this.tripsRepository.isResourceBusy(data.truckId, 'truck');
+      const isBusy = await this.tripsRepository.isResourceBusy(data.truckId, 'truck', id);
       if (isBusy) throw new BadRequestException('This truck is currently on an active trip');
     }
 
@@ -60,5 +70,12 @@ export class TripsService {
     }
 
     return this.tripsRepository.updateStatus(id, status);
+  }
+
+  async setFinanciallyClosed(id: string, companyId: string, financiallyClosed: boolean): Promise<Trip> {
+    const trip = await this.findById(id);
+    if (trip.companyId !== companyId) throw new ForbiddenException();
+
+    return this.tripsRepository.setFinanciallyClosed(id, financiallyClosed);
   }
 }

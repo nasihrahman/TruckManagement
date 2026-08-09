@@ -20,7 +20,8 @@ model Company {
   maintenance  MaintenanceRecord[]
   issues       Issue[]
   notifications Notification[]
-  reports      Report[]
+  driverShifts DriverShift[]
+  locationPings LocationPing[]
 }
 
 model User {
@@ -39,6 +40,9 @@ model User {
   createdAt               DateTime @default(now())
   trips                   Trip[]
   driverProfile           DriverProfile?
+  driverShifts            DriverShift[]
+  locationPings           LocationPing[]
+  expenses                Expense[]
 }
 
 model DriverProfile {
@@ -80,10 +84,12 @@ model Trip {
   scheduledAt   DateTime?
   startedAt     DateTime?
   completedAt   DateTime?
+  financiallyClosed Boolean   @default(false)
   createdAt     DateTime      @default(now())
   fuelReceipts  FuelReceipt[]
   expenses      Expense[]
   issues        Issue[]
+  locationPings LocationPing[]
 }
 
 enum TripStatus {
@@ -105,15 +111,27 @@ model FuelReceipt {
 }
 
 model Expense {
-  id        String   @id @default(cuid())
-  company   Company  @relation(fields: [companyId], references: [id])
+  id        String          @id @default(cuid())
+  company   Company         @relation(fields: [companyId], references: [id])
   companyId String
-  trip      Trip?    @relation(fields: [tripId], references: [id])
-  tripId    String?
-  category  String
-  amount    Decimal  @db.Decimal(10,2)
+  trip      Trip            @relation(fields: [tripId], references: [id])
+  tripId    String
+  driver    User            @relation(fields: [driverId], references: [id])
+  driverId  String
+  category  ExpenseCategory
+  amount    Decimal         @db.Decimal(10, 2)
+  photoUrl  String?
+  odometer  Int?
+  reason    String?
   notes     String?
-  createdAt DateTime @default(now())
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+}
+
+enum ExpenseCategory {
+  FUEL
+  FINE
+  OTHER
 }
 
 model MaintenanceRecord {
@@ -165,12 +183,26 @@ model Notification {
   createdAt DateTime @default(now())
 }
 
-model Report {
-  id          String   @id @default(cuid())
-  company     Company  @relation(fields: [companyId], references: [id])
-  companyId   String
-  type        String
-  params      Json
-  fileUrl     String?
-  generatedAt DateTime @default(now())
+model DriverShift {
+  id        String   @id @default(cuid())
+  driver    User     @relation(fields: [driverId], references: [id])
+  driverId  String
+  company   Company  @relation(fields: [companyId], references: [id])
+  companyId String
+  startedAt DateTime @default(now())
+  endedAt   DateTime?
+  date      DateTime @default(now())
+}
+
+model LocationPing {
+  id        String   @id @default(cuid())
+  driver    User     @relation(fields: [driverId], references: [id])
+  driverId  String
+  company   Company  @relation(fields: [companyId], references: [id])
+  companyId String
+  trip      Trip?    @relation(fields: [tripId], references: [id])
+  tripId    String?
+  latitude  Float
+  longitude Float
+  createdAt DateTime @default(now())
 }

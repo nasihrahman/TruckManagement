@@ -1,17 +1,36 @@
 import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { DriversService } from './drivers.service';
 import { CreateDriverDto } from './dto/create-driver.dto';
 
 @Controller('drivers')
-@UseGuards(JwtAuthGuard)
-@Roles(Role.OWNER)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class DriversController {
   constructor(private readonly driversService: DriversService) {}
 
+  @Post('me/go-online')
+  @Roles(Role.DRIVER)
+  async goOnline(@Request() req: any) {
+    return this.driversService.goOnline(req.user.userId, req.user.companyId);
+  }
+
+  @Post('me/go-offline')
+  @Roles(Role.DRIVER)
+  async goOffline(@Request() req: any) {
+    return this.driversService.goOffline(req.user.userId, req.user.companyId);
+  }
+
+  @Get()
+  @Roles(Role.OWNER)
+  async list(@Request() req: any) {
+    return this.driversService.getDrivers(req.user.companyId);
+  }
+
   @Post()
+  @Roles(Role.OWNER)
   async create(@Request() req: any, @Body() dto: CreateDriverDto) {
     const result = await this.driversService.createDriver(req.user.companyId, dto);
     return {
@@ -21,22 +40,20 @@ export class DriversController {
     };
   }
 
-  @Get()
-  async list(@Request() req: any) {
-    return this.driversService.getDrivers(req.user.companyId);
-  }
-
   @Get(':id')
+  @Roles(Role.OWNER)
   async get(@Request() req: any, @Param('id') id: string) {
     return this.driversService.getDriver(id, req.user.companyId);
   }
 
   @Patch(':id/deactivate')
+  @Roles(Role.OWNER)
   async deactivate(@Request() req: any, @Param('id') id: string) {
     return this.driversService.deactivateDriver(id, req.user.companyId);
   }
 
   @Patch(':id/reactivate')
+  @Roles(Role.OWNER)
   async reactivate(@Request() req: any, @Param('id') id: string) {
     return this.driversService.reactivateDriver(id, req.user.companyId);
   }

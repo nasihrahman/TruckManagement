@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/trip.dart';
 import '../services/api_service.dart';
 import '../widgets/slide_to_act.dart';
+import 'trip_expenses_screen.dart';
 
 class DriverTripsScreen extends StatefulWidget {
   const DriverTripsScreen({super.key, required this.apiService});
@@ -143,6 +144,22 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
                           child: Text('No actions available for this trip',
                               style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
                         ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => TripExpensesScreen(apiService: widget.apiService, trip: trip),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.receipt_long, size: 18),
+                          label: Text(trip.financiallyClosed ? 'View Expenses' : 'Log Expenses'),
+                        ),
+                      ),
                     ],
                   ),
                 ),

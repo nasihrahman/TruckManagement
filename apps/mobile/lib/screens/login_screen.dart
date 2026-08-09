@@ -30,16 +30,18 @@ class _LoginScreenState extends State<LoginScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => ChangePasswordScreen(apiService: widget.apiService),
+            builder: (_) => ChangePasswordScreen(
+              apiService: widget.apiService,
+              userRole: loginResult['role'],
+            ),
           ),
         );
       } else {
-        // Pass role to the next screen or store it in a session manager
         if (loginResult['role'] == 'DRIVER') {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => const DriverTripsScreen(apiService: widget.apiService),
+              builder: (_) => DriverTripsScreen(apiService: widget.apiService),
             ),
           );
         } else {

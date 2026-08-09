@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'driver_trips_screen.dart';
+import 'trips_screen.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
-  const ChangePasswordScreen({super.key, required this.apiService});
+  const ChangePasswordScreen({super.key, required this.apiService, required this.userRole});
   final ApiService apiService;
+  final String userRole;
 
   @override
   State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
@@ -31,7 +34,25 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password updated successfully!')),
       );
-      Navigator.pop(context); // Go back to TripsScreen
+      
+      if (widget.userRole == 'DRIVER') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DriverTripsScreen(apiService: widget.apiService),
+          ),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+            MaterialPageRoute(
+              builder: (_) => TripsScreen(
+                apiService: widget.apiService,
+                userRole: widget.userRole,
+              ),
+            ),
+          );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

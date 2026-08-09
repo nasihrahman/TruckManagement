@@ -3,11 +3,12 @@ import { TrucksService } from './trucks.service';
 import { CreateTruckDto } from './dto/truck.dto';
 import { UpdateTruckDto } from './dto/truck.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 
 @Controller('trucks')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.OWNER)
 export class TrucksController {
   constructor(private readonly trucksService: TrucksService) {}

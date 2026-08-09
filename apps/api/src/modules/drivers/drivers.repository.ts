@@ -1,6 +1,35 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { User, DriverProfile } from '@prisma/client';
+
+const SAFE_DRIVER_SELECT = {
+  id: true,
+  companyId: true,
+  email: true,
+  phone: true,
+  role: true,
+  firstName: true,
+  lastName: true,
+  isActive: true,
+  mustChangePassword: true,
+  createdAt: true,
+  driverProfile: {
+    select: { id: true, licenseNumber: true, updatedAt: true },
+  },
+} as const;
+
+export type SafeDriver = {
+  id: string;
+  companyId: string;
+  email: string | null;
+  phone: string;
+  role: 'OWNER' | 'DRIVER';
+  firstName: string | null;
+  lastName: string | null;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  createdAt: Date;
+  driverProfile: { id: string; licenseNumber: string | null; updatedAt: Date } | null;
+};
 
 @Injectable()
 export class DriversRepository {
@@ -13,7 +42,7 @@ export class DriversRepository {
     email?: string;
     licenseNumber?: string;
     hashedPassword: string;
-  }): Promise<User & { driverProfile: DriverProfile | null }> {
+  }): Promise<SafeDriver> {
     return this.prisma.user.create({
       data: {
         companyId: input.companyId,
@@ -30,35 +59,62 @@ export class DriversRepository {
           },
         },
       },
-      include: { driverProfile: true },
+      select: SAFE_DRIVER_SELECT,
     });
   }
 
-  async findById(id: string): Promise<(User & { driverProfile: DriverProfile | null }) | null> {
+  async findById(id: string): Promise<SafeDriver | null> {
     return this.prisma.user.findUnique({
       where: { id },
-      include: { driverProfile: true },
+      select: SAFE_DRIVER_SELECT,
     });
   }
 
-  async findByCompany(companyId: string): Promise<(User & { driverProfile: DriverProfile | null })[]> {
+  async findByCompany(companyId: string): Promise<SafeDriver[]> {
     return this.prisma.user.findMany({
       where: { companyId, role: 'DRIVER' },
-      include: { driverProfile: true },
+      select: SAFE_DRIVER_SELECT,
     });
   }
 
-  async deactivateDriver(id: string): Promise<User> {
+  async deactivateDriver(id: string): Promise<SafeDriver> {
     return this.prisma.user.update({
       where: { id },
       data: { isActive: false },
+      select: SAFE_DRIVER_SELECT,
     });
   }
 
-  async reactivateDriver(id: string): Promise<User> {
+  async reactivateDriver(id: string): Promise<SafeDriver> {
     return this.prisma.user.update({
       where: { id },
       data: { isActive: true },
+      select: SAFE_DRIVER_SELECT,
+    });
+  }
+
+  async getActiveShift(userId: string): Promise<any | null> {
+    return this.prisma.driverShift.findFirst({
+      where: {
+        driverId: userId,
+        endedAt: null,
+      },
+    });
+  }
+
+  async createShift(userId: string, companyId: string): Promise<void> {
+    await this.prisma.driverShift.create({
+      data: {
+        driverId: userId,
+        companyId,
+      },
+    });
+  }
+
+  async endShift(shiftId: string): Promise<void> {
+    await this.prisma.driverShift.update({
+      where: { id: shiftId },
+      data: { endedAt: new Date() },
     });
   }
 }
