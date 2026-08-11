@@ -12,6 +12,10 @@ const SAFE_DRIVER_SELECT = {
   isActive: true,
   mustChangePassword: true,
   createdAt: true,
+  defaultTruckId: true,
+  defaultTruck: {
+    select: { id: true, plate: true, brand: true },
+  },
   driverProfile: {
     select: { id: true, licenseNumber: true, updatedAt: true },
   },
@@ -28,6 +32,8 @@ export type SafeDriver = {
   isActive: boolean;
   mustChangePassword: boolean;
   createdAt: Date;
+  defaultTruckId: string | null;
+  defaultTruck: { id: string; plate: string; brand: string | null } | null;
   driverProfile: { id: string; licenseNumber: string | null; updatedAt: Date } | null;
 };
 
@@ -42,6 +48,7 @@ export class DriversRepository {
     email?: string;
     licenseNumber?: string;
     hashedPassword: string;
+    defaultTruckId?: string;
   }): Promise<SafeDriver> {
     return this.prisma.user.create({
       data: {
@@ -53,11 +60,42 @@ export class DriversRepository {
         firstName: input.name,
         mustChangePassword: true,
         isActive: true,
+        defaultTruckId: input.defaultTruckId,
         driverProfile: {
           create: {
             licenseNumber: input.licenseNumber,
           },
         },
+      },
+      select: SAFE_DRIVER_SELECT,
+    });
+  }
+
+  async updateDriver(
+    id: string,
+    input: {
+      name?: string;
+      phone?: string;
+      email?: string;
+      licenseNumber?: string;
+      defaultTruckId?: string;
+    },
+  ): Promise<SafeDriver> {
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        firstName: input.name,
+        phone: input.phone,
+        email: input.email,
+        defaultTruckId: input.defaultTruckId,
+        driverProfile: input.licenseNumber !== undefined
+          ? {
+              upsert: {
+                create: { licenseNumber: input.licenseNumber },
+                update: { licenseNumber: input.licenseNumber },
+              },
+            }
+          : undefined,
       },
       select: SAFE_DRIVER_SELECT,
     });

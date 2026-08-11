@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/trip.dart';
 import '../services/api_service.dart';
 import 'drivers_screen.dart';
-import 'assign_trip_screen.dart';
-import '../config/app_config.dart';
+import 'trucks_screen.dart';
+import 'trip_form_screen.dart';
+import 'owner_trip_detail_screen.dart';
 
 class TripsScreen extends StatefulWidget {
   const TripsScreen({super.key, required this.apiService, this.userRole});
@@ -16,8 +17,6 @@ class TripsScreen extends StatefulWidget {
 
 class _TripsScreenState extends State<TripsScreen> {
   late Future<List<Trip>> _tripsFuture;
-  final _originController = TextEditingController();
-  final _destinationController = TextEditingController();
 
   @override
   void initState() {
@@ -32,18 +31,21 @@ class _TripsScreenState extends State<TripsScreen> {
   }
 
   Future<void> _createTrip() async {
-    try {
-      await widget.apiService.createTrip(
-        origin: _originController.text,
-        destination: _destinationController.text,
-      );
-      _originController.clear();
-      _destinationController.clear();
-      await _refreshTrips();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-    }
+    final created = await Navigator.push<Trip>(
+      context,
+      MaterialPageRoute(builder: (_) => TripFormScreen(apiService: widget.apiService)),
+    );
+    if (created != null) _refreshTrips();
+  }
+
+  Future<void> _openTripDetail(Trip trip) async {
+    final res = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OwnerTripDetailScreen(apiService: widget.apiService, trip: trip),
+      ),
+    );
+    if (res == true) _refreshTrips();
   }
 
   @override
@@ -52,6 +54,18 @@ class _TripsScreenState extends State<TripsScreen> {
       appBar: AppBar(
         title: const Text('Trips'),
         actions: [
+          if (widget.userRole == 'OWNER')
+            IconButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TrucksScreen(apiService: widget.apiService),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.local_shipping),
+            ),
           if (widget.userRole == 'OWNER')
             IconButton(
               onPressed: () {
@@ -77,73 +91,43 @@ class _TripsScreenState extends State<TripsScreen> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            if (widget.userRole == 'OWNER')
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      TextField(controller: _originController, decoration: const InputDecoration(labelText: 'Origin')),
-                      const SizedBox(height: 8),
-                      TextField(controller: _destinationController, decoration: const InputDecoration(labelText: 'Destination')),
-                      const SizedBox(height: 12),
-                      FilledButton.icon(onPressed: _createTrip, icon: const Icon(Icons.add), label: const Text('Create trip')),
-                    ],
+        child: FutureBuilder<List<Trip>>(
+          future: _tripsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(child: Text(snapshot.error.toString()));
+            }
+            final trips = snapshot.data ?? [];
+            if (trips.isEmpty) {
+              return const Center(child: Text('No trips yet'));
+            }
+            return ListView.builder(
+              itemCount: trips.length,
+              itemBuilder: (context, index) {
+                final trip = trips[index];
+                return Card(
+                  child: ListTile(
+                    title: Text('${trip.origin} → ${trip.destination}'),
+                    subtitle: Text('Status: ${trip.status}'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: widget.userRole == 'OWNER' ? () => _openTripDetail(trip) : null,
                   ),
-                ),
-              ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: FutureBuilder<List<Trip>>(
-                future: _tripsFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return Center(child: Text(snapshot.error.toString()));
-                  }
-                  final trips = snapshot.data ?? [];
-                  if (trips.isEmpty) {
-                    return const Center(child: Text('No trips yet'));
-                  }
-                  return ListView.builder(
-                    itemCount: trips.length,
-                    itemBuilder: (context, index) {
-                      final trip = trips[index];
-                      return Card(
-                        child: ListTile(
-                          title: Text('${trip.origin} → ${trip.destination}'),
-                          subtitle: Text('Status: ${trip.status}'),
-                          trailing: const Icon(Icons.local_shipping),
-                          onTap: widget.userRole == 'OWNER' 
-                            ? () async {
-                                final res = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => AssignTripScreen(
-                                      apiService: widget.apiService,
-                                      tripId: trip.id,
-                                      initialDriverId: trip.driverId,
-                                      initialTruckId: trip.truckId,
-                                    ),
-                                  ),
-                                );
-                                if (res == true) _refreshTrips();
-                              }
-                            : null,
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
+                );
+              },
+            );
+          },
         ),
       ),
+      floatingActionButton: widget.userRole == 'OWNER'
+          ? FloatingActionButton.extended(
+              onPressed: _createTrip,
+              icon: const Icon(Icons.add),
+              label: const Text('Create Trip'),
+            )
+          : null,
     );
   }
 }

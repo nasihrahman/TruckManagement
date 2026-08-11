@@ -87,7 +87,7 @@ describe('Trips (e2e)', () => {
 
     // owner assigns driver and truck
     await request(app.getHttpServer())
-      .patch(`/api/v1/trips/${tripId}/assign`)
+      .patch(`/api/v1/trips/${tripId}`)
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ driverId: driver.id, truckId: truck.id })
       .expect(200);

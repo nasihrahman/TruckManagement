@@ -46,6 +46,16 @@ class _DriversScreenState extends State<DriversScreen> {
     }
   }
 
+  Future<void> _editDriver(Driver driver) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddDriverScreen(apiService: widget.apiService, existing: driver),
+      ),
+    );
+    _refreshDrivers();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -85,15 +95,22 @@ class _DriversScreenState extends State<DriversScreen> {
                   ),
                   title: Text(driver.name),
                   subtitle: Text(driver.phone),
+                  onTap: () => _editDriver(driver),
                   trailing: PopupMenuButton<String>(
                     onSelected: (value) {
-                      if (value == 'deactivate') {
+                      if (value == 'edit') {
+                        _editDriver(driver);
+                      } else if (value == 'deactivate') {
                         _handleDeactivate(driver.id);
                       } else if (value == 'reactivate') {
                         _handleReactivate(driver.id);
                       }
                     },
                     itemBuilder: (BuildContext context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Text('Edit'),
+                      ),
                       if (!driver.isActive)
                         const PopupMenuItem(
                           value: 'reactivate',

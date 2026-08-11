@@ -5,7 +5,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { TripsService } from './trips.service';
 import { CreateTripDto } from './dto/create-trip.dto';
-import { AssignTripDto } from './dto/assign-trip.dto';
+import { UpdateTripDto } from './dto/update-trip.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
 
 @Controller('trips')
@@ -35,10 +35,10 @@ export class TripsController {
     return trip;
   }
 
-  @Patch(':id/assign')
+  @Patch(':id')
   @Roles(Role.OWNER)
-  async assign(@Request() req: any, @Param('id') id: string, @Body() body: AssignTripDto) {
-    return this.tripsService.assign(id, req.user.companyId, body as any);
+  async update(@Request() req: any, @Param('id') id: string, @Body() body: UpdateTripDto) {
+    return this.tripsService.update(id, req.user.companyId, body);
   }
 
   @Patch(':id/status')

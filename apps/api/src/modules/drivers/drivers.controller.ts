@@ -5,6 +5,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { DriversService } from './drivers.service';
 import { CreateDriverDto } from './dto/create-driver.dto';
+import { UpdateDriverDto } from './dto/update-driver.dto';
 
 @Controller('drivers')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -44,6 +45,12 @@ export class DriversController {
   @Roles(Role.OWNER)
   async get(@Request() req: any, @Param('id') id: string) {
     return this.driversService.getDriver(id, req.user.companyId);
+  }
+
+  @Patch(':id')
+  @Roles(Role.OWNER)
+  async update(@Request() req: any, @Param('id') id: string, @Body() dto: UpdateDriverDto) {
+    return this.driversService.updateDriver(id, req.user.companyId, dto);
   }
 
   @Patch(':id/deactivate')

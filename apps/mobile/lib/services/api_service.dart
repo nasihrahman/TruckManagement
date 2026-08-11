@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/trip.dart';
 import '../models/driver.dart';
 import '../models/expense.dart';
+import '../models/truck.dart';
 
 class ApiService {
   ApiService({required this.baseUrl});
@@ -69,11 +70,21 @@ class ApiService {
     return [];
   }
 
-  Future<Trip> createTrip({required String origin, required String destination}) async {
+  Future<Trip> createTrip({
+    required String origin,
+    required String destination,
+    String? driverId,
+    String? truckId,
+  }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/trips'),
       headers: await _headers(auth: true),
-      body: jsonEncode({'origin': origin, 'destination': destination}),
+      body: jsonEncode({
+        'origin': origin,
+        'destination': destination,
+        if (driverId != null) 'driverId': driverId,
+        if (truckId != null) 'truckId': truckId,
+      }),
     );
     final body = jsonDecode(response.body);
     if (response.statusCode >= 400) {
@@ -82,19 +93,28 @@ class ApiService {
     return Trip.fromJson(body);
   }
 
-  Future<void> assignTrip(String tripId, {String? driverId, String? truckId}) async {
+  Future<Trip> updateTrip(
+    String tripId, {
+    String? origin,
+    String? destination,
+    String? driverId,
+    String? truckId,
+  }) async {
     final response = await http.patch(
-      Uri.parse('$baseUrl/trips/$tripId/assign'),
+      Uri.parse('$baseUrl/trips/$tripId'),
       headers: await _headers(auth: true),
       body: jsonEncode({
+        if (origin != null) 'origin': origin,
+        if (destination != null) 'destination': destination,
         if (driverId != null) 'driverId': driverId,
         if (truckId != null) 'truckId': truckId,
       }),
     );
     final body = jsonDecode(response.body);
     if (response.statusCode >= 400) {
-      throw Exception(body['message'] ?? 'Failed to assign trip');
+      throw Exception(body['message'] ?? 'Failed to update trip');
     }
+    return Trip.fromJson(body);
   }
 
   Future<Trip> updateTripStatus(String tripId, String status) async {
@@ -125,7 +145,7 @@ class ApiService {
     return [];
   }
 
-  Future<List<Map<String, dynamic>>> fetchTrucks() async {
+  Future<List<Truck>> fetchTrucks() async {
     final response = await http.get(
       Uri.parse('$baseUrl/trucks'),
       headers: await _headers(auth: true),
@@ -135,9 +155,43 @@ class ApiService {
       throw Exception(data['message'] ?? 'Unable to fetch trucks');
     }
     if (data is List) {
-      return data.cast<Map<String, dynamic>>();
+      return data.map((item) => Truck.fromJson(item as Map<String, dynamic>)).toList();
     }
     return [];
+  }
+
+  Future<Truck> createTruck({required String plate, required String brand, String? vin}) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/trucks'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({
+        'plate': plate,
+        'brand': brand,
+        if (vin != null && vin.isNotEmpty) 'vin': vin,
+      }),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Unable to create truck');
+    }
+    return Truck.fromJson(body);
+  }
+
+  Future<Truck> updateTruck(String id, {required String plate, required String brand, String? vin}) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/trucks/$id'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({
+        'plate': plate,
+        'brand': brand,
+        if (vin != null && vin.isNotEmpty) 'vin': vin,
+      }),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Unable to update truck');
+    }
+    return Truck.fromJson(body);
   }
 
   Future<Map<String, dynamic>> createDriver({
@@ -146,6 +200,7 @@ class ApiService {
     String? email,
     String? licenseNumber,
     String? initialPassword,
+    String? defaultTruckId,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/drivers'),
@@ -156,6 +211,7 @@ class ApiService {
         'email': email,
         'licenseNumber': licenseNumber,
         'initialPassword': initialPassword,
+        if (defaultTruckId != null) 'defaultTruckId': defaultTruckId,
       }),
     );
     final body = jsonDecode(response.body);
@@ -163,6 +219,32 @@ class ApiService {
       throw Exception(body['message'] ?? 'Unable to create driver');
     }
     return body;
+  }
+
+  Future<Driver> updateDriver(
+    String id, {
+    required String name,
+    required String phone,
+    String? email,
+    String? licenseNumber,
+    String? defaultTruckId,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/drivers/$id'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({
+        'name': name,
+        'phone': phone,
+        'email': email,
+        'licenseNumber': licenseNumber,
+        if (defaultTruckId != null) 'defaultTruckId': defaultTruckId,
+      }),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Unable to update driver');
+    }
+    return Driver.fromJson(body);
   }
 
   Future<void> deactivateDriver(String id) async {

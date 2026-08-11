@@ -7,16 +7,6 @@ export class TripsService {
   constructor(private readonly tripsRepository: TripsRepository) {}
 
   async create(companyId: string, payload: Prisma.TripUncheckedCreateInput): Promise<Trip> {
-    if (payload.driverId) {
-      const isBusy = await this.tripsRepository.isResourceBusy(payload.driverId as string, 'driver');
-      if (isBusy) throw new BadRequestException('This driver is currently on an active trip');
-    }
-
-    if (payload.truckId) {
-      const isBusy = await this.tripsRepository.isResourceBusy(payload.truckId as string, 'truck');
-      if (isBusy) throw new BadRequestException('This truck is currently on an active trip');
-    }
-
     return this.tripsRepository.create({ ...payload, companyId });
   }
 
@@ -33,21 +23,15 @@ export class TripsService {
     return trip;
   }
 
-  async assign(id: string, companyId: string, data: { truckId?: string; driverId?: string }) {
+  async update(
+    id: string,
+    companyId: string,
+    data: { origin?: string; destination?: string; scheduledAt?: string; truckId?: string; driverId?: string },
+  ) {
     const trip = await this.findById(id);
     if (trip.companyId !== companyId) throw new ForbiddenException();
 
-    if (data.driverId) {
-      const isBusy = await this.tripsRepository.isResourceBusy(data.driverId, 'driver', id);
-      if (isBusy) throw new BadRequestException('This driver is currently on an active trip');
-    }
-
-    if (data.truckId) {
-      const isBusy = await this.tripsRepository.isResourceBusy(data.truckId, 'truck', id);
-      if (isBusy) throw new BadRequestException('This truck is currently on an active trip');
-    }
-
-    return this.tripsRepository.update(id, { truckId: data.truckId, driverId: data.driverId });
+    return this.tripsRepository.update(id, data);
   }
 
   async updateStatus(id: string, user: { userId: string; role: string; companyId: string }, status: TripStatus) {

@@ -21,4 +21,8 @@ export class CreateDriverDto {
   @IsOptional()
   @IsString()
   initialPassword?: string;
+
+  @IsOptional()
+  @IsString()
+  defaultTruckId?: string;
 }

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/trip.dart';
 import '../services/api_service.dart';
-import '../widgets/slide_to_act.dart';
-import 'trip_expenses_screen.dart';
+import 'trip_detail_screen.dart';
 
 class DriverTripsScreen extends StatefulWidget {
   const DriverTripsScreen({super.key, required this.apiService});
@@ -27,36 +26,14 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
     });
   }
 
-  Future<void> _handleTripAction(Trip trip) async {
-    String newStatus;
-    String label;
-    Color color;
-
-    if (trip.status == 'ASSIGNED') {
-      newStatus = 'IN_TRANSIT';
-      label = 'Start Trip';
-      color = Colors.green;
-    } else if (trip.status == 'IN_TRANSIT') {
-      newStatus = 'DELIVERED'; // Defaulting to DELIVERED for now
-      label = 'End Trip';
-      color = Colors.red;
-    } else {
-      return;
-    }
-
-    try {
-      await widget.apiService.updateTripStatus(trip.id, newStatus);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Trip marked as $newStatus')),
-      );
-      _refreshTrips();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
-    }
+  Future<void> _openTripDetail(Trip trip) async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TripDetailScreen(apiService: widget.apiService, trip: trip),
+      ),
+    );
+    if (changed == true) _refreshTrips();
   }
 
   @override
@@ -90,88 +67,67 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
           }
           final trips = snapshot.data ?? [];
           if (trips.isEmpty) {
-            return const Center(child: Text('No assigned trips found'));
+            return const Center(child: Text('No trips yet'));
           }
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: trips.length,
-            itemBuilder: (context, index) {
-              final trip = trips[index];
-              final bool canAct = trip.status == 'ASSIGNED' || trip.status == 'IN_TRANSIT';
 
-              return Card(
-                margin: const EdgeInsets.only(bottom: 16),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${trip.origin} → ${trip.destination}',
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _getStatusColor(trip.status).withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              trip.status,
-                              style: TextStyle(
-                                color: _getStatusColor(trip.status),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ],
+          final currentTrips = trips.where((t) => t.status == 'ASSIGNED' || t.status == 'IN_TRANSIT').toList();
+          final completedTrips = trips.where((t) => t.status == 'DELIVERED' || t.status == 'FAILED').toList();
+
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              if (currentTrips.isNotEmpty) ...[
+                const Text('Current Trip', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
+                const SizedBox(height: 8),
+                for (final trip in currentTrips)
+                  Card(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(16),
+                      title: Text(
+                        '${trip.origin} → ${trip.destination}',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
-                      const SizedBox(height: 16),
-                      if (canAct)
-                        Center(
-                          child: SlideToAct(
-                            label: trip.status == 'ASSIGNED' ? 'Slide to Start Trip' : 'Slide to End Trip',
-                            thumbColor: trip.status == 'ASSIGNED' ? Colors.green : Colors.red,
-                            onAct: () => _handleTripAction(trip),
-                          ),
-                        )
-                      else
-                        const Center(
-                          child: Text('No actions available for this trip',
-                              style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
-                        ),
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => TripExpensesScreen(apiService: widget.apiService, trip: trip),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.receipt_long, size: 18),
-                          label: Text(trip.financiallyClosed ? 'View Expenses' : 'Log Expenses'),
-                        ),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: _StatusBadge(status: trip.status),
                       ),
-                    ],
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _openTripDetail(trip),
+                    ),
                   ),
-                ),
-              );
-            },
+                const SizedBox(height: 8),
+              ],
+              if (completedTrips.isNotEmpty) ...[
+                const Text('Completed Trips', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
+                const SizedBox(height: 8),
+                for (final trip in completedTrips)
+                  Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      title: Text('${trip.origin} → ${trip.destination}'),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: _StatusBadge(status: trip.status),
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _openTripDetail(trip),
+                    ),
+                  ),
+              ],
+            ],
           );
         },
       ),
     );
   }
+}
 
-  Color _getStatusColor(String status) {
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.status});
+  final String status;
+
+  Color get _color {
     switch (status) {
       case 'ASSIGNED':
         return Colors.blue;
@@ -184,5 +140,20 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
       default:
         return Colors.grey;
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: _color.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        status,
+        style: TextStyle(color: _color, fontWeight: FontWeight.bold, fontSize: 12),
+      ),
+    );
   }
 }

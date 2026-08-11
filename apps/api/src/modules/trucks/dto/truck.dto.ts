@@ -5,6 +5,10 @@ export class CreateTruckDto {
   @IsString()
   plate!: string;
 
+  @IsNotEmpty()
+  @IsString()
+  brand!: string;
+
   @IsOptional()
   @IsString()
   vin?: string;
@@ -14,6 +18,10 @@ export class UpdateTruckDto {
   @IsOptional()
   @IsString()
   plate?: string;
+
+  @IsOptional()
+  @IsString()
+  brand?: string;
 
   @IsOptional()
   @IsString()

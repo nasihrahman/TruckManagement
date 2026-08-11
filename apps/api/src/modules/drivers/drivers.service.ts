@@ -2,13 +2,26 @@ import { Injectable, ForbiddenException, NotFoundException, BadRequestException 
 import * as bcrypt from 'bcrypt';
 import { DriversRepository, SafeDriver } from './drivers.repository';
 import { CreateDriverDto } from './dto/create-driver.dto';
+import { UpdateDriverDto } from './dto/update-driver.dto';
+import { TrucksService } from '../trucks/trucks.service';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class DriversService {
-  constructor(private driversRepository: DriversRepository) {}
+  constructor(
+    private driversRepository: DriversRepository,
+    private trucksService: TrucksService,
+  ) {}
+
+  private async assertTruckBelongsToCompany(truckId: string, companyId: string): Promise<void> {
+    await this.trucksService.findOne(truckId, companyId);
+  }
 
   async createDriver(companyId: string, dto: CreateDriverDto): Promise<{ user: SafeDriver; tempPassword: string }> {
+    if (dto.defaultTruckId) {
+      await this.assertTruckBelongsToCompany(dto.defaultTruckId, companyId);
+    }
+
     // Use provided password or phone as temp password
     const tempPassword = dto.initialPassword || dto.phone;
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
@@ -21,9 +34,41 @@ export class DriversService {
         email: dto.email,
         licenseNumber: dto.licenseNumber,
         hashedPassword,
+        defaultTruckId: dto.defaultTruckId,
       });
 
       return { user, tempPassword };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          const target = (error.meta?.target as string[]) || [];
+          if (target.includes('phone')) {
+            throw new BadRequestException('A driver with this phone number already exists');
+          }
+          if (target.includes('email')) {
+            throw new BadRequestException('A driver with this email address already exists');
+          }
+        }
+      }
+      throw error;
+    }
+  }
+
+  async updateDriver(id: string, companyId: string, dto: UpdateDriverDto): Promise<SafeDriver> {
+    await this.getDriver(id, companyId);
+
+    if (dto.defaultTruckId) {
+      await this.assertTruckBelongsToCompany(dto.defaultTruckId, companyId);
+    }
+
+    try {
+      return await this.driversRepository.updateDriver(id, {
+        name: dto.name,
+        phone: dto.phone,
+        email: dto.email,
+        licenseNumber: dto.licenseNumber,
+        defaultTruckId: dto.defaultTruckId,
+      });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {

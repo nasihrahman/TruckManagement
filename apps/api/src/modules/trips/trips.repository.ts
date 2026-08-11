@@ -38,21 +38,4 @@ export class TripsRepository {
       },
     });
   }
-
-  async isResourceBusy(resourceId: string, type: 'driver' | 'truck', excludeTripId?: string): Promise<boolean> {
-    const activeStatuses: TripStatus[] = ['ASSIGNED', 'IN_TRANSIT'];
-    const whereClause: Prisma.TripWhereInput =
-      type === 'driver'
-        ? { driverId: resourceId, status: { in: activeStatuses } }
-        : { truckId: resourceId, status: { in: activeStatuses } };
-
-    if (excludeTripId) {
-      whereClause.id = { not: excludeTripId };
-    }
-
-    const count = await this.prisma.trip.count({
-      where: whereClause,
-    });
-    return count > 0;
-  }
 }

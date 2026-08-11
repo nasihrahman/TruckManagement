@@ -13,6 +13,7 @@ export class TrucksRepository {
       data: {
         companyId,
         plate: dto.plate,
+        brand: dto.brand,
         vin: dto.vin,
       },
     });

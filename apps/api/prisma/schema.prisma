@@ -38,6 +38,8 @@ model User {
   isActive                Boolean  @default(true)
   mustChangePassword      Boolean  @default(false)
   createdAt               DateTime @default(now())
+  defaultTruck            Truck?   @relation(fields: [defaultTruckId], references: [id])
+  defaultTruckId          String?
   trips                   Trip[]
   driverProfile           DriverProfile?
   driverShifts            DriverShift[]
@@ -59,14 +61,16 @@ enum Role {
 }
 
 model Truck {
-  id          String              @id @default(cuid())
-  company     Company             @relation(fields: [companyId], references: [id])
-  companyId   String
-  plate       String              @unique
-  vin         String?
-  createdAt   DateTime            @default(now())
-  maintenance MaintenanceRecord[]
-  trips       Trip[]
+  id             String              @id @default(cuid())
+  company        Company             @relation(fields: [companyId], references: [id])
+  companyId      String
+  plate          String              @unique
+  brand          String?
+  vin            String?
+  createdAt      DateTime            @default(now())
+  maintenance    MaintenanceRecord[]
+  trips          Trip[]
+  defaultForDrivers User[]
 }
 
 model Trip {
