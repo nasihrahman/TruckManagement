@@ -1,5 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { DriversRepository, SafeDriver } from './drivers.repository';
 import { CreateDriverDto } from './dto/create-driver.dto';
 import { UpdateDriverDto } from './dto/update-driver.dto';
@@ -7,6 +8,10 @@ import { LocationPingDto } from './dto/location-ping.dto';
 import { TrucksService } from '../trucks/trucks.service';
 import { TripsRepository } from '../trips/trips.repository';
 import { Prisma } from '@prisma/client';
+
+function generateTempPassword(): string {
+  return randomBytes(6).toString('base64url');
+}
 
 @Injectable()
 export class DriversService {
@@ -114,6 +119,14 @@ export class DriversService {
       throw new BadRequestException('Driver is already active');
     }
     return this.driversRepository.reactivateDriver(id);
+  }
+
+  async resetPassword(id: string, companyId: string): Promise<{ user: SafeDriver; tempPassword: string }> {
+    await this.getDriver(id, companyId);
+    const tempPassword = generateTempPassword();
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+    const user = await this.driversRepository.resetPassword(id, hashedPassword);
+    return { user, tempPassword };
   }
 
   async getOwnProfile(userId: string, companyId: string): Promise<SafeDriver & { isOnline: boolean }> {

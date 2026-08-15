@@ -46,6 +46,39 @@ class _DriversScreenState extends State<DriversScreen> {
     }
   }
 
+  Future<void> _handleResetPassword(Driver driver) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset Password?'),
+        content: Text('This generates a new temporary password for ${driver.name} and signs them out of their current session.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Reset')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final tempPassword = await widget.apiService.resetDriverPassword(driver.id);
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Password Reset'),
+          content: Text('The new temporary password for ${driver.name} is: $tempPassword\nPlease share this with them.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
   Future<void> _editDriver(Driver driver) async {
     await Navigator.push(
       context,
@@ -104,12 +137,18 @@ class _DriversScreenState extends State<DriversScreen> {
                         _handleDeactivate(driver.id);
                       } else if (value == 'reactivate') {
                         _handleReactivate(driver.id);
+                      } else if (value == 'reset-password') {
+                        _handleResetPassword(driver);
                       }
                     },
                     itemBuilder: (BuildContext context) => [
                       const PopupMenuItem(
                         value: 'edit',
                         child: Text('Edit'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'reset-password',
+                        child: Text('Reset Password'),
                       ),
                       if (!driver.isActive)
                         const PopupMenuItem(

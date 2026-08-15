@@ -131,6 +131,14 @@ export class DriversRepository {
     });
   }
 
+  async resetPassword(id: string, hashedPassword: string): Promise<SafeDriver> {
+    return this.prisma.user.update({
+      where: { id },
+      data: { password: hashedPassword, mustChangePassword: true, currentHashedRefreshToken: null },
+      select: SAFE_DRIVER_SELECT,
+    });
+  }
+
   async getActiveShift(userId: string): Promise<any | null> {
     return this.prisma.driverShift.findFirst({
       where: {

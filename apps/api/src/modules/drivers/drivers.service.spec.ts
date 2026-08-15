@@ -19,6 +19,7 @@ describe('DriversService', () => {
     findByCompany: jest.fn(),
     deactivateDriver: jest.fn(),
     reactivateDriver: jest.fn(),
+    resetPassword: jest.fn(),
     getActiveShift: jest.fn(),
     createShift: jest.fn(),
     endShift: jest.fn(),
@@ -167,6 +168,29 @@ describe('DriversService', () => {
       mockRepository.findById.mockResolvedValue(mockUser);
 
       await expect(service.reactivateDriver('driver-1', 'company-1')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('generates a fresh temp password and hashes it', async () => {
+      mockRepository.findById.mockResolvedValue(mockUser);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-new-password');
+      mockRepository.resetPassword.mockResolvedValue({ ...mockUser, mustChangePassword: true });
+
+      const result = await service.resetPassword('driver-1', 'company-1');
+
+      expect(result.tempPassword).toEqual(expect.any(String));
+      expect(result.tempPassword.length).toBeGreaterThan(0);
+      expect(bcrypt.hash).toHaveBeenCalledWith(result.tempPassword, 10);
+      expect(mockRepository.resetPassword).toHaveBeenCalledWith('driver-1', 'hashed-new-password');
+      expect(result.user.mustChangePassword).toBe(true);
+    });
+
+    it('throws NotFoundException if the driver does not belong to the company', async () => {
+      mockRepository.findById.mockResolvedValue(mockUser);
+
+      await expect(service.resetPassword('driver-1', 'different-company')).rejects.toThrow(NotFoundException);
+      expect(mockRepository.resetPassword).not.toHaveBeenCalled();
     });
   });
 });

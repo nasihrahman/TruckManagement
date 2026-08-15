@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import '../models/trip.dart';
 import '../models/driver.dart';
 import '../models/truck.dart';
+import '../models/owner.dart';
 import '../services/api_service.dart';
 import '../services/web_download.dart';
 import 'owner_trip_detail_screen.dart';
 import 'drivers_screen.dart';
 import 'trucks_screen.dart';
+import 'owners_screen.dart';
 
 class OwnerDashboardTab extends StatefulWidget {
   const OwnerDashboardTab({super.key, required this.apiService, required this.onLogout});
@@ -39,12 +41,14 @@ class OwnerDashboardTabState extends State<OwnerDashboardTab> {
       widget.apiService.fetchDrivers(),
       widget.apiService.fetchTrucks(),
       widget.apiService.fetchOnlineLocations(),
+      widget.apiService.fetchOwners(),
     ]);
     return _DashboardData(
       trips: results[0] as List<Trip>,
       drivers: results[1] as List<Driver>,
       trucks: results[2] as List<Truck>,
       onlineDrivers: results[3] as List<Map<String, dynamic>>,
+      owners: results[4] as List<Owner>,
     );
   }
 
@@ -109,7 +113,7 @@ class OwnerDashboardTabState extends State<OwnerDashboardTab> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _StatTile(
                         label: 'Drivers (${data.activeDriverCount} active)',
@@ -118,6 +122,18 @@ class OwnerDashboardTabState extends State<OwnerDashboardTab> {
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(builder: (_) => DriversScreen(apiService: widget.apiService)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _StatTile(
+                        label: 'Owners',
+                        value: '${data.owners.length}',
+                        icon: Icons.admin_panel_settings_outlined,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => OwnersScreen(apiService: widget.apiService)),
                         ),
                       ),
                     ),
@@ -227,8 +243,15 @@ class _DashboardData {
   final List<Driver> drivers;
   final List<Truck> trucks;
   final List<Map<String, dynamic>> onlineDrivers;
+  final List<Owner> owners;
 
-  _DashboardData({required this.trips, required this.drivers, required this.trucks, required this.onlineDrivers});
+  _DashboardData({
+    required this.trips,
+    required this.drivers,
+    required this.trucks,
+    required this.onlineDrivers,
+    required this.owners,
+  });
 
   int get activeDriverCount => drivers.where((d) => d.isActive).length;
 

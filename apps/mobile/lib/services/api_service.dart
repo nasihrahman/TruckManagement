@@ -6,6 +6,7 @@ import '../models/trip.dart';
 import '../models/driver.dart';
 import '../models/expense.dart';
 import '../models/truck.dart';
+import '../models/owner.dart';
 
 class ApiService {
   ApiService({required this.baseUrl});
@@ -345,6 +346,56 @@ class ApiService {
     if (response.statusCode >= 400) {
       throw Exception('Failed to reactivate driver');
     }
+  }
+
+  Future<String> resetDriverPassword(String id) async {
+    final response = await _send(
+      (headers) => http.patch(Uri.parse('$baseUrl/drivers/$id/reset-password'), headers: headers),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Failed to reset password');
+    }
+    return body['tempPassword'] as String;
+  }
+
+  Future<List<Owner>> fetchOwners() async {
+    final response = await _send(
+      (headers) => http.get(Uri.parse('$baseUrl/owners'), headers: headers),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(data['message'] ?? 'Unable to fetch owners');
+    }
+    if (data is List) {
+      return data.map((item) => Owner.fromJson(item as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  Future<String> createOwner({
+    required String name,
+    required String phone,
+    String? email,
+    String? initialPassword,
+  }) async {
+    final response = await _send(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/owners'),
+        headers: headers,
+        body: jsonEncode({
+          'name': name,
+          'phone': phone,
+          if (email != null && email.isNotEmpty) 'email': email,
+          if (initialPassword != null && initialPassword.isNotEmpty) 'initialPassword': initialPassword,
+        }),
+      ),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Unable to create owner');
+    }
+    return body['tempPassword'] as String;
   }
 
   Future<void> goOnline() async {

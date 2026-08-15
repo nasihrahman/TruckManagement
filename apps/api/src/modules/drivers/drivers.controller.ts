@@ -83,4 +83,15 @@ export class DriversController {
   async reactivate(@Request() req: any, @Param('id') id: string) {
     return this.driversService.reactivateDriver(id, req.user.companyId);
   }
+
+  @Patch(':id/reset-password')
+  @Roles(Role.OWNER)
+  async resetPassword(@Request() req: any, @Param('id') id: string) {
+    const result = await this.driversService.resetPassword(id, req.user.companyId);
+    return {
+      driver: result.user,
+      tempPassword: result.tempPassword,
+      message: 'Password reset. Share the new temp password with the driver.',
+    };
+  }
 }

@@ -5,6 +5,7 @@ import 'owner_dashboard_tab.dart';
 import 'trips_screen.dart';
 import 'trip_form_screen.dart';
 import 'add_driver_screen.dart';
+import 'add_owner_screen.dart';
 import 'truck_form_screen.dart';
 
 class OwnerHomeScreen extends StatefulWidget {
@@ -58,6 +59,14 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
     _refreshAll();
   }
 
+  Future<void> _quickAddOwner() async {
+    Navigator.pop(context);
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => AddOwnerScreen(apiService: widget.apiService)),
+    );
+  }
+
   void _showQuickActions() {
     showModalBottomSheet(
       context: context,
@@ -78,6 +87,11 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
               leading: const Icon(Icons.local_shipping),
               title: const Text('Add Truck'),
               onTap: _quickAddTruck,
+            ),
+            ListTile(
+              leading: const Icon(Icons.admin_panel_settings_outlined),
+              title: const Text('Add Owner'),
+              onTap: _quickAddOwner,
             ),
           ],
         ),
