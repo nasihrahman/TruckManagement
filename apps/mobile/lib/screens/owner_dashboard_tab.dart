@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/trip.dart';
 import '../models/driver.dart';
 import '../models/truck.dart';
@@ -373,6 +374,16 @@ class _OnlineDriversCard extends StatelessWidget {
     return '${diff.inDays}d ago';
   }
 
+  Future<void> _openInGoogleMaps(BuildContext context, double lat, double lng) async {
+    final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open Google Maps')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -398,6 +409,17 @@ class _OnlineDriversCard extends StatelessWidget {
                         _agoLabel(d['lastLocation']?['at']),
                         style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                       ),
+                      if (d['lastLocation'] != null)
+                        IconButton(
+                          icon: const Icon(Icons.map_outlined, size: 20),
+                          tooltip: 'Open in Google Maps',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => _openInGoogleMaps(
+                            context,
+                            (d['lastLocation']['latitude'] as num).toDouble(),
+                            (d['lastLocation']['longitude'] as num).toDouble(),
+                          ),
+                        ),
                     ],
                   ),
                 ),
