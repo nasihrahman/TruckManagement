@@ -33,4 +33,38 @@ export class ReportsRepository {
       },
     });
   }
+
+  async findTripsCreatedInRangeDetailed(companyId: string, start: Date, end: Date) {
+    return this.prisma.trip.findMany({
+      where: { companyId, createdAt: { gte: start, lt: end } },
+      select: {
+        origin: true,
+        destination: true,
+        status: true,
+        scheduledAt: true,
+        startedAt: true,
+        completedAt: true,
+        financiallyClosed: true,
+        driver: { select: DRIVER_SELECT },
+        truck: { select: { plate: true, brand: true } },
+      },
+      orderBy: { scheduledAt: 'asc' },
+    });
+  }
+
+  async findExpensesInRangeDetailed(companyId: string, start: Date, end: Date) {
+    return this.prisma.expense.findMany({
+      where: { companyId, createdAt: { gte: start, lt: end } },
+      select: {
+        amount: true,
+        category: true,
+        reason: true,
+        notes: true,
+        createdAt: true,
+        driver: { select: DRIVER_SELECT },
+        trip: { select: { origin: true, destination: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
 }

@@ -27,4 +27,14 @@ export class ReportsController {
     });
     res.send(buffer);
   }
+
+  @Get('operations-detail.xlsx')
+  async operationsDetailXlsx(@Request() req: any, @Query() query: OperationsReportQueryDto, @Res() res: Response) {
+    const buffer = await this.reportsService.exportOperationsDetail(req.user.companyId, query.period, query.date);
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="operations-detail-${query.period}.xlsx"`,
+    });
+    res.send(buffer);
+  }
 }

@@ -495,6 +495,19 @@ class ApiService {
     return response.bodyBytes;
   }
 
+  Future<Uint8List> exportOperationsDetail({required String period, DateTime? date}) async {
+    final query = {
+      'period': period,
+      if (date != null) 'date': date.toIso8601String(),
+    };
+    final uri = Uri.parse('$baseUrl/reports/operations-detail.xlsx').replace(queryParameters: query);
+    final response = await _send((headers) => http.get(uri, headers: headers));
+    if (response.statusCode >= 400) {
+      throw Exception('Unable to export report');
+    }
+    return response.bodyBytes;
+  }
+
   Future<Uint8List> exportTripsExcel() async {
     final response = await _send(
       (headers) => http.get(Uri.parse('$baseUrl/trips/export.xlsx'), headers: headers),

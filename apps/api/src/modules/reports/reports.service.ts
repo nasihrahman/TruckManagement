@@ -162,4 +162,69 @@ export class ReportsService {
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
   }
+
+  async exportOperationsDetail(companyId: string, period: ReportPeriod, dateStr?: string): Promise<Buffer> {
+    const anchor = dateStr ? new Date(dateStr) : new Date();
+    const { start, end } = resolvePeriodRange(period, anchor);
+
+    const [trips, expenses] = await Promise.all([
+      this.reportsRepository.findTripsCreatedInRangeDetailed(companyId, start, end),
+      this.reportsRepository.findExpensesInRangeDetailed(companyId, start, end),
+    ]);
+
+    const workbook = new ExcelJS.Workbook();
+
+    const tripsSheet = workbook.addWorksheet('Trips');
+    tripsSheet.columns = [
+      { header: 'Driver', key: 'driver', width: 22 },
+      { header: 'Origin', key: 'origin', width: 20 },
+      { header: 'Destination', key: 'destination', width: 20 },
+      { header: 'Truck', key: 'truck', width: 20 },
+      { header: 'Status', key: 'status', width: 14 },
+      { header: 'Delivery Date', key: 'scheduledAt', width: 16 },
+      { header: 'Started At', key: 'startedAt', width: 18 },
+      { header: 'Completed At', key: 'completedAt', width: 18 },
+      { header: 'Financially Closed', key: 'financiallyClosed', width: 16 },
+    ];
+    tripsSheet.getRow(1).font = { bold: true };
+    for (const trip of trips) {
+      tripsSheet.addRow({
+        driver: driverName(trip.driver),
+        origin: trip.origin,
+        destination: trip.destination,
+        truck: trip.truck ? [trip.truck.plate, trip.truck.brand].filter(Boolean).join(' · ') : 'Unassigned',
+        status: trip.status,
+        scheduledAt: trip.scheduledAt ? trip.scheduledAt.toISOString().slice(0, 10) : '',
+        startedAt: trip.startedAt ? trip.startedAt.toISOString().slice(0, 16).replace('T', ' ') : '',
+        completedAt: trip.completedAt ? trip.completedAt.toISOString().slice(0, 16).replace('T', ' ') : '',
+        financiallyClosed: trip.financiallyClosed ? 'Yes' : 'No',
+      });
+    }
+
+    const expensesSheet = workbook.addWorksheet('Expenses');
+    expensesSheet.columns = [
+      { header: 'Date', key: 'date', width: 18 },
+      { header: 'Driver', key: 'driver', width: 22 },
+      { header: 'Trip', key: 'trip', width: 32 },
+      { header: 'Category', key: 'category', width: 12 },
+      { header: 'Amount', key: 'amount', width: 12 },
+      { header: 'Reason', key: 'reason', width: 24 },
+      { header: 'Notes', key: 'notes', width: 24 },
+    ];
+    expensesSheet.getRow(1).font = { bold: true };
+    for (const expense of expenses) {
+      expensesSheet.addRow({
+        date: expense.createdAt.toISOString().slice(0, 16).replace('T', ' '),
+        driver: driverName(expense.driver),
+        trip: expense.trip ? `${expense.trip.origin} → ${expense.trip.destination}` : '',
+        category: expense.category,
+        amount: Number(expense.amount),
+        reason: expense.reason ?? '',
+        notes: expense.notes ?? '',
+      });
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
+  }
 }

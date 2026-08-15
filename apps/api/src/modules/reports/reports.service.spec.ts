@@ -9,6 +9,8 @@ describe('ReportsService', () => {
     findTripsCreatedInRange: jest.fn(),
     findTripsCompletedInRange: jest.fn(),
     findExpensesInRange: jest.fn(),
+    findTripsCreatedInRangeDetailed: jest.fn(),
+    findExpensesInRangeDetailed: jest.fn(),
   };
 
   const driverA = { id: 'driver-a', firstName: 'Alice', lastName: null };
@@ -81,5 +83,49 @@ describe('ReportsService', () => {
     expect(result.period).toBe('quarterly');
     expect(result.rangeStart).toBe('2026-01-01T00:00:00.000Z');
     expect(result.rangeEnd).toBe('2026-04-01T00:00:00.000Z');
+  });
+
+  describe('exportOperationsDetail', () => {
+    it('queries the detailed repository methods for the resolved range and returns a workbook buffer', async () => {
+      mockRepository.findTripsCreatedInRangeDetailed.mockResolvedValue([
+        {
+          origin: 'A',
+          destination: 'B',
+          status: 'DELIVERED',
+          scheduledAt: new Date('2026-08-11'),
+          startedAt: new Date('2026-08-11'),
+          completedAt: new Date('2026-08-12'),
+          financiallyClosed: true,
+          driver: driverA,
+          truck: { plate: 'TRK-1', brand: 'Tata' },
+        },
+      ]);
+      mockRepository.findExpensesInRangeDetailed.mockResolvedValue([
+        {
+          amount: 250,
+          category: 'FUEL',
+          reason: null,
+          notes: 'Full tank',
+          createdAt: new Date('2026-08-11'),
+          driver: driverA,
+          trip: { origin: 'A', destination: 'B' },
+        },
+      ]);
+
+      const buffer = await service.exportOperationsDetail('company-1', 'weekly', '2026-08-15');
+
+      expect(mockRepository.findTripsCreatedInRangeDetailed).toHaveBeenCalledWith(
+        'company-1',
+        new Date('2026-08-10T00:00:00.000Z'),
+        new Date('2026-08-17T00:00:00.000Z'),
+      );
+      expect(mockRepository.findExpensesInRangeDetailed).toHaveBeenCalledWith(
+        'company-1',
+        new Date('2026-08-10T00:00:00.000Z'),
+        new Date('2026-08-17T00:00:00.000Z'),
+      );
+      expect(buffer).toBeInstanceOf(Buffer);
+      expect(buffer.length).toBeGreaterThan(0);
+    });
   });
 });
