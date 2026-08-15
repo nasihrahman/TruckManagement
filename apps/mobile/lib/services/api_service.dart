@@ -468,6 +468,33 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> fetchOperationsReport({required String period, DateTime? date}) async {
+    final query = {
+      'period': period,
+      if (date != null) 'date': date.toIso8601String(),
+    };
+    final uri = Uri.parse('$baseUrl/reports/operations').replace(queryParameters: query);
+    final response = await _send((headers) => http.get(uri, headers: headers));
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Unable to load report');
+    }
+    return body as Map<String, dynamic>;
+  }
+
+  Future<Uint8List> exportOperationsReport({required String period, DateTime? date}) async {
+    final query = {
+      'period': period,
+      if (date != null) 'date': date.toIso8601String(),
+    };
+    final uri = Uri.parse('$baseUrl/reports/operations.xlsx').replace(queryParameters: query);
+    final response = await _send((headers) => http.get(uri, headers: headers));
+    if (response.statusCode >= 400) {
+      throw Exception('Unable to export report');
+    }
+    return response.bodyBytes;
+  }
+
   Future<Uint8List> exportTripsExcel() async {
     final response = await _send(
       (headers) => http.get(Uri.parse('$baseUrl/trips/export.xlsx'), headers: headers),

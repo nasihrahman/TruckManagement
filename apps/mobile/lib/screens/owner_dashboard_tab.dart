@@ -10,6 +10,7 @@ import 'owner_trip_detail_screen.dart';
 import 'drivers_screen.dart';
 import 'trucks_screen.dart';
 import 'owners_screen.dart';
+import 'operations_report_screen.dart';
 
 class OwnerDashboardTab extends StatefulWidget {
   const OwnerDashboardTab({super.key, required this.apiService, required this.onLogout});
@@ -179,23 +180,41 @@ class OwnerDashboardTabState extends State<OwnerDashboardTab> {
                 ],
                 const SizedBox(height: 12),
                 Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('This Week\'s Expenses', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        const SizedBox(height: 8),
-                        Text('Total: ₹${data.weeklyExpenseTotal.toStringAsFixed(2)}',
-                            style: const TextStyle(fontSize: 18)),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Fuel ₹${data.weeklyByCategory['FUEL']?.toStringAsFixed(2) ?? '0.00'} · '
-                          'Fines ₹${data.weeklyByCategory['FINE']?.toStringAsFixed(2) ?? '0.00'} · '
-                          'Other ₹${data.weeklyByCategory['OTHER']?.toStringAsFixed(2) ?? '0.00'}',
-                          style: TextStyle(color: Colors.grey.shade700),
-                        ),
-                      ],
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(4),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => OperationsReportScreen(apiService: widget.apiService)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text('This Week\'s Expenses',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              ),
+                              Icon(Icons.chevron_right, color: Colors.grey.shade500),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text('Total: ₹${data.weeklyExpenseTotal.toStringAsFixed(2)}',
+                              style: const TextStyle(fontSize: 18)),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Fuel ₹${data.weeklyByCategory['FUEL']?.toStringAsFixed(2) ?? '0.00'} · '
+                            'Fines ₹${data.weeklyByCategory['FINE']?.toStringAsFixed(2) ?? '0.00'} · '
+                            'Other ₹${data.weeklyByCategory['OTHER']?.toStringAsFixed(2) ?? '0.00'}',
+                            style: TextStyle(color: Colors.grey.shade700),
+                          ),
+                          const SizedBox(height: 4),
+                          Text('View full trips & expenses report',
+                              style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 12)),
+                        ],
+                      ),
                     ),
                   ),
                 ),
