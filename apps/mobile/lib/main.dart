@@ -7,18 +7,28 @@ import 'screens/login_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
-  runApp(const TruckManagementApp());
+  runApp(TruckManagementApp());
 }
 
 class TruckManagementApp extends StatelessWidget {
-  const TruckManagementApp({super.key});
+  TruckManagementApp({super.key}) : apiService = ApiService(baseUrl: AppConfig.apiBaseUrl) {
+    // If the refresh token is missing/invalid, bounce back to the login screen
+    // instead of leaving the user stuck on a screen full of failed requests.
+    apiService.onSessionExpired = () {
+      navigatorKey.currentState?.popUntil((route) => route.isFirst);
+    };
+  }
+
+  final ApiService apiService;
+  final navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Truck Management',
       theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
-      home: LoginScreen(apiService: ApiService(baseUrl: AppConfig.apiBaseUrl)),
+      home: LoginScreen(apiService: apiService),
     );
   }
 }

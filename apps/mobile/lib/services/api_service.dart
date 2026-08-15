@@ -12,34 +12,90 @@ class ApiService {
 
   final String baseUrl;
   String? _token;
+  String? _refreshToken;
+  Future<bool>? _refreshFuture;
 
-  Future<void> _loadToken() async {
+  /// Called when the refresh token is missing/invalid and the user needs to log in again.
+  void Function()? onSessionExpired;
+
+  Future<void> _loadTokens() async {
     if (_token != null) return;
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('auth_token');
+    _refreshToken = prefs.getString('refresh_token');
   }
 
-  Future<void> saveToken(String token) async {
-    _token = token;
+  Future<void> saveTokens(String accessToken, String refreshToken) async {
+    _token = accessToken;
+    _refreshToken = refreshToken;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('auth_token', token);
+    await prefs.setString('auth_token', accessToken);
+    await prefs.setString('refresh_token', refreshToken);
   }
 
   Future<void> clearToken() async {
     _token = null;
+    _refreshToken = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
+    await prefs.remove('refresh_token');
   }
 
   Future<Map<String, String>> _headers({bool auth = false}) async {
     if (auth) {
-      await _loadToken();
+      await _loadTokens();
     }
     final headers = <String, String>{'Content-Type': 'application/json'};
     if (auth && _token != null) {
       headers['Authorization'] = 'Bearer $_token';
     }
     return headers;
+  }
+
+  /// Sends an authenticated request, transparently refreshing the access token
+  /// and retrying once if the server responds 401 (access token expired).
+  Future<http.Response> _send(
+    Future<http.Response> Function(Map<String, String> headers) requestFn, {
+    bool auth = true,
+  }) async {
+    var headers = await _headers(auth: auth);
+    var response = await requestFn(headers);
+    if (auth && response.statusCode == 401) {
+      final refreshed = await _refreshAccessToken();
+      if (refreshed) {
+        headers = await _headers(auth: auth);
+        response = await requestFn(headers);
+      } else {
+        onSessionExpired?.call();
+      }
+    }
+    return response;
+  }
+
+  Future<bool> _refreshAccessToken() {
+    return _refreshFuture ??= _doRefresh().whenComplete(() => _refreshFuture = null);
+  }
+
+  Future<bool> _doRefresh() async {
+    await _loadTokens();
+    final refreshToken = _refreshToken;
+    if (refreshToken == null) return false;
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refreshToken': refreshToken}),
+      );
+      if (response.statusCode >= 400) {
+        await clearToken();
+        return false;
+      }
+      final body = jsonDecode(response.body);
+      await saveTokens(body['accessToken'], body['refreshToken']);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<Map<String, dynamic>> login({required String email, required String password}) async {
@@ -52,14 +108,13 @@ class ApiService {
     if (response.statusCode >= 400) {
       throw Exception(body['message'] ?? 'Login failed');
     }
-    await saveToken(body['accessToken']);
+    await saveTokens(body['accessToken'], body['refreshToken']);
     return body;
   }
 
   Future<List<Trip>> fetchTrips() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/trips'),
-      headers: await _headers(auth: true),
+    final response = await _send(
+      (headers) => http.get(Uri.parse('$baseUrl/trips'), headers: headers),
     );
     final data = jsonDecode(response.body);
     if (response.statusCode >= 400) {
@@ -78,16 +133,18 @@ class ApiService {
     String? truckId,
     DateTime? scheduledAt,
   }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/trips'),
-      headers: await _headers(auth: true),
-      body: jsonEncode({
-        'origin': origin,
-        'destination': destination,
-        if (driverId != null) 'driverId': driverId,
-        if (truckId != null) 'truckId': truckId,
-        if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
-      }),
+    final response = await _send(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/trips'),
+        headers: headers,
+        body: jsonEncode({
+          'origin': origin,
+          'destination': destination,
+          if (driverId != null) 'driverId': driverId,
+          if (truckId != null) 'truckId': truckId,
+          if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
+        }),
+      ),
     );
     final body = jsonDecode(response.body);
     if (response.statusCode >= 400) {
@@ -104,16 +161,18 @@ class ApiService {
     String? truckId,
     DateTime? scheduledAt,
   }) async {
-    final response = await http.patch(
-      Uri.parse('$baseUrl/trips/$tripId'),
-      headers: await _headers(auth: true),
-      body: jsonEncode({
-        if (origin != null) 'origin': origin,
-        if (destination != null) 'destination': destination,
-        if (driverId != null) 'driverId': driverId,
-        if (truckId != null) 'truckId': truckId,
-        if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
-      }),
+    final response = await _send(
+      (headers) => http.patch(
+        Uri.parse('$baseUrl/trips/$tripId'),
+        headers: headers,
+        body: jsonEncode({
+          if (origin != null) 'origin': origin,
+          if (destination != null) 'destination': destination,
+          if (driverId != null) 'driverId': driverId,
+          if (truckId != null) 'truckId': truckId,
+          if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
+        }),
+      ),
     );
     final body = jsonDecode(response.body);
     if (response.statusCode >= 400) {
@@ -123,10 +182,12 @@ class ApiService {
   }
 
   Future<Trip> updateTripStatus(String tripId, String status) async {
-    final response = await http.patch(
-      Uri.parse('$baseUrl/trips/$tripId/status'),
-      headers: await _headers(auth: true),
-      body: jsonEncode({'status': status}),
+    final response = await _send(
+      (headers) => http.patch(
+        Uri.parse('$baseUrl/trips/$tripId/status'),
+        headers: headers,
+        body: jsonEncode({'status': status}),
+      ),
     );
     final body = jsonDecode(response.body);
     if (response.statusCode >= 400) {
@@ -136,9 +197,8 @@ class ApiService {
   }
 
   Future<void> deleteTrip(String tripId) async {
-    final response = await http.delete(
-      Uri.parse('$baseUrl/trips/$tripId'),
-      headers: await _headers(auth: true),
+    final response = await _send(
+      (headers) => http.delete(Uri.parse('$baseUrl/trips/$tripId'), headers: headers),
     );
     if (response.statusCode >= 400) {
       final body = jsonDecode(response.body);
@@ -147,9 +207,8 @@ class ApiService {
   }
 
   Future<List<Driver>> fetchDrivers() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/drivers'),
-      headers: await _headers(auth: true),
+    final response = await _send(
+      (headers) => http.get(Uri.parse('$baseUrl/drivers'), headers: headers),
     );
     final data = jsonDecode(response.body);
     if (response.statusCode >= 400) {
@@ -162,9 +221,8 @@ class ApiService {
   }
 
   Future<List<Truck>> fetchTrucks() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/trucks'),
-      headers: await _headers(auth: true),
+    final response = await _send(
+      (headers) => http.get(Uri.parse('$baseUrl/trucks'), headers: headers),
     );
     final data = jsonDecode(response.body);
     if (response.statusCode >= 400) {
@@ -177,14 +235,16 @@ class ApiService {
   }
 
   Future<Truck> createTruck({required String plate, required String brand, String? vin}) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/trucks'),
-      headers: await _headers(auth: true),
-      body: jsonEncode({
-        'plate': plate,
-        'brand': brand,
-        if (vin != null && vin.isNotEmpty) 'vin': vin,
-      }),
+    final response = await _send(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/trucks'),
+        headers: headers,
+        body: jsonEncode({
+          'plate': plate,
+          'brand': brand,
+          if (vin != null && vin.isNotEmpty) 'vin': vin,
+        }),
+      ),
     );
     final body = jsonDecode(response.body);
     if (response.statusCode >= 400) {
@@ -194,14 +254,16 @@ class ApiService {
   }
 
   Future<Truck> updateTruck(String id, {required String plate, required String brand, String? vin}) async {
-    final response = await http.patch(
-      Uri.parse('$baseUrl/trucks/$id'),
-      headers: await _headers(auth: true),
-      body: jsonEncode({
-        'plate': plate,
-        'brand': brand,
-        if (vin != null && vin.isNotEmpty) 'vin': vin,
-      }),
+    final response = await _send(
+      (headers) => http.patch(
+        Uri.parse('$baseUrl/trucks/$id'),
+        headers: headers,
+        body: jsonEncode({
+          'plate': plate,
+          'brand': brand,
+          if (vin != null && vin.isNotEmpty) 'vin': vin,
+        }),
+      ),
     );
     final body = jsonDecode(response.body);
     if (response.statusCode >= 400) {
@@ -218,17 +280,19 @@ class ApiService {
     String? initialPassword,
     String? defaultTruckId,
   }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/drivers'),
-      headers: await _headers(auth: true),
-      body: jsonEncode({
-        'name': name,
-        'phone': phone,
-        'email': email,
-        'licenseNumber': licenseNumber,
-        'initialPassword': initialPassword,
-        if (defaultTruckId != null) 'defaultTruckId': defaultTruckId,
-      }),
+    final response = await _send(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/drivers'),
+        headers: headers,
+        body: jsonEncode({
+          'name': name,
+          'phone': phone,
+          'email': email,
+          'licenseNumber': licenseNumber,
+          'initialPassword': initialPassword,
+          if (defaultTruckId != null) 'defaultTruckId': defaultTruckId,
+        }),
+      ),
     );
     final body = jsonDecode(response.body);
     if (response.statusCode >= 400) {
@@ -245,16 +309,18 @@ class ApiService {
     String? licenseNumber,
     String? defaultTruckId,
   }) async {
-    final response = await http.patch(
-      Uri.parse('$baseUrl/drivers/$id'),
-      headers: await _headers(auth: true),
-      body: jsonEncode({
-        'name': name,
-        'phone': phone,
-        'email': email,
-        'licenseNumber': licenseNumber,
-        if (defaultTruckId != null) 'defaultTruckId': defaultTruckId,
-      }),
+    final response = await _send(
+      (headers) => http.patch(
+        Uri.parse('$baseUrl/drivers/$id'),
+        headers: headers,
+        body: jsonEncode({
+          'name': name,
+          'phone': phone,
+          'email': email,
+          'licenseNumber': licenseNumber,
+          if (defaultTruckId != null) 'defaultTruckId': defaultTruckId,
+        }),
+      ),
     );
     final body = jsonDecode(response.body);
     if (response.statusCode >= 400) {
@@ -264,9 +330,8 @@ class ApiService {
   }
 
   Future<void> deactivateDriver(String id) async {
-    final response = await http.patch(
-      Uri.parse('$baseUrl/drivers/$id/deactivate'),
-      headers: await _headers(auth: true),
+    final response = await _send(
+      (headers) => http.patch(Uri.parse('$baseUrl/drivers/$id/deactivate'), headers: headers),
     );
     if (response.statusCode >= 400) {
       throw Exception('Failed to deactivate driver');
@@ -274,9 +339,8 @@ class ApiService {
   }
 
   Future<void> reactivateDriver(String id) async {
-    final response = await http.patch(
-      Uri.parse('$baseUrl/drivers/$id/reactivate'),
-      headers: await _headers(auth: true),
+    final response = await _send(
+      (headers) => http.patch(Uri.parse('$baseUrl/drivers/$id/reactivate'), headers: headers),
     );
     if (response.statusCode >= 400) {
       throw Exception('Failed to reactivate driver');
@@ -284,9 +348,8 @@ class ApiService {
   }
 
   Future<void> goOnline() async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/drivers/me/go-online'),
-      headers: await _headers(auth: true),
+    final response = await _send(
+      (headers) => http.post(Uri.parse('$baseUrl/drivers/me/go-online'), headers: headers),
     );
     if (response.statusCode >= 400) {
       final body = jsonDecode(response.body);
@@ -295,9 +358,8 @@ class ApiService {
   }
 
   Future<void> goOffline() async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/drivers/me/go-offline'),
-      headers: await _headers(auth: true),
+    final response = await _send(
+      (headers) => http.post(Uri.parse('$baseUrl/drivers/me/go-offline'), headers: headers),
     );
     if (response.statusCode >= 400) {
       final body = jsonDecode(response.body);
@@ -306,9 +368,8 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> fetchMyDriverProfile() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/drivers/me'),
-      headers: await _headers(auth: true),
+    final response = await _send(
+      (headers) => http.get(Uri.parse('$baseUrl/drivers/me'), headers: headers),
     );
     final body = jsonDecode(response.body);
     if (response.statusCode >= 400) {
@@ -318,10 +379,12 @@ class ApiService {
   }
 
   Future<void> pingLocation(double latitude, double longitude) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/drivers/me/location'),
-      headers: await _headers(auth: true),
-      body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
+    final response = await _send(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/drivers/me/location'),
+        headers: headers,
+        body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
+      ),
     );
     if (response.statusCode >= 400) {
       final body = jsonDecode(response.body);
@@ -330,9 +393,8 @@ class ApiService {
   }
 
   Future<List<Map<String, dynamic>>> fetchOnlineLocations() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/drivers/online-locations'),
-      headers: await _headers(auth: true),
+    final response = await _send(
+      (headers) => http.get(Uri.parse('$baseUrl/drivers/online-locations'), headers: headers),
     );
     final body = jsonDecode(response.body);
     if (response.statusCode >= 400) {
@@ -342,10 +404,12 @@ class ApiService {
   }
 
   Future<void> changePassword(String newPassword) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/auth/change-password'),
-      headers: await _headers(auth: true),
-      body: jsonEncode({'newPassword': newPassword}),
+    final response = await _send(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/auth/change-password'),
+        headers: headers,
+        body: jsonEncode({'newPassword': newPassword}),
+      ),
     );
     if (response.statusCode >= 400) {
       final body = jsonDecode(response.body);
@@ -354,9 +418,8 @@ class ApiService {
   }
 
   Future<Uint8List> exportTripsExcel() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/trips/export.xlsx'),
-      headers: await _headers(auth: true),
+    final response = await _send(
+      (headers) => http.get(Uri.parse('$baseUrl/trips/export.xlsx'), headers: headers),
     );
     if (response.statusCode >= 400) {
       throw Exception('Unable to export trips');
@@ -365,9 +428,8 @@ class ApiService {
   }
 
   Future<List<Expense>> fetchExpenses(String tripId) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/trips/$tripId/expenses'),
-      headers: await _headers(auth: true),
+    final response = await _send(
+      (headers) => http.get(Uri.parse('$baseUrl/trips/$tripId/expenses'), headers: headers),
     );
     final data = jsonDecode(response.body);
     if (response.statusCode >= 400) {
@@ -387,16 +449,18 @@ class ApiService {
     String? reason,
     String? notes,
   }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/trips/$tripId/expenses'),
-      headers: await _headers(auth: true),
-      body: jsonEncode({
-        'category': expenseCategoryToJson(category),
-        'amount': amount,
-        if (odometer != null) 'odometer': odometer,
-        if (reason != null && reason.isNotEmpty) 'reason': reason,
-        if (notes != null && notes.isNotEmpty) 'notes': notes,
-      }),
+    final response = await _send(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/trips/$tripId/expenses'),
+        headers: headers,
+        body: jsonEncode({
+          'category': expenseCategoryToJson(category),
+          'amount': amount,
+          if (odometer != null) 'odometer': odometer,
+          if (reason != null && reason.isNotEmpty) 'reason': reason,
+          if (notes != null && notes.isNotEmpty) 'notes': notes,
+        }),
+      ),
     );
     final body = jsonDecode(response.body);
     if (response.statusCode >= 400) {
@@ -414,16 +478,18 @@ class ApiService {
     String? reason,
     String? notes,
   }) async {
-    final response = await http.patch(
-      Uri.parse('$baseUrl/trips/$tripId/expenses/$expenseId'),
-      headers: await _headers(auth: true),
-      body: jsonEncode({
-        'category': expenseCategoryToJson(category),
-        'amount': amount,
-        'odometer': odometer,
-        'reason': reason,
-        'notes': notes,
-      }),
+    final response = await _send(
+      (headers) => http.patch(
+        Uri.parse('$baseUrl/trips/$tripId/expenses/$expenseId'),
+        headers: headers,
+        body: jsonEncode({
+          'category': expenseCategoryToJson(category),
+          'amount': amount,
+          'odometer': odometer,
+          'reason': reason,
+          'notes': notes,
+        }),
+      ),
     );
     final body = jsonDecode(response.body);
     if (response.statusCode >= 400) {
@@ -433,9 +499,8 @@ class ApiService {
   }
 
   Future<void> deleteExpense(String tripId, String expenseId) async {
-    final response = await http.delete(
-      Uri.parse('$baseUrl/trips/$tripId/expenses/$expenseId'),
-      headers: await _headers(auth: true),
+    final response = await _send(
+      (headers) => http.delete(Uri.parse('$baseUrl/trips/$tripId/expenses/$expenseId'), headers: headers),
     );
     if (response.statusCode >= 400) {
       final body = jsonDecode(response.body);

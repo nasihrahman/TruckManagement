@@ -105,7 +105,7 @@ export class AuthService {
         { sub: userId, email, role, companyId },
         {
           secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-          expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION', '7d'),
+          expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION', '30d'),
         },
       ),
     ]);
