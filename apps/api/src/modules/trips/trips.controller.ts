@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards, NotFoundException } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Request, Res, UseGuards, NotFoundException } from '@nestjs/common';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -14,16 +15,26 @@ export class TripsController {
   constructor(private readonly tripsService: TripsService) {}
 
   @Post()
-  @Roles(Role.OWNER)
+  @Roles(Role.OWNER, Role.DRIVER)
   async create(@Request() req: any, @Body() body: CreateTripDto) {
-    const companyId = req.user.companyId;
-    return this.tripsService.create(companyId, body as any);
+    return this.tripsService.create(req.user, body as any);
   }
 
   @Get()
   async list(@Request() req: any) {
     const companyId = req.user.companyId;
     return this.tripsService.findByCompany(companyId, req.user.userId, req.user.role);
+  }
+
+  @Get('export.xlsx')
+  @Roles(Role.OWNER)
+  async exportXlsx(@Request() req: any, @Res() res: Response) {
+    const buffer = await this.tripsService.exportToExcel(req.user.companyId);
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename="trips-export.xlsx"',
+    });
+    res.send(buffer);
   }
 
   @Get(':id')
@@ -50,5 +61,11 @@ export class TripsController {
   @Roles(Role.OWNER)
   async financiallyClose(@Request() req: any, @Param('id') id: string) {
     return this.tripsService.setFinanciallyClosed(id, req.user.companyId, true);
+  }
+
+  @Delete(':id')
+  async remove(@Request() req: any, @Param('id') id: string) {
+    await this.tripsService.remove(id, req.user);
+    return { success: true };
   }
 }

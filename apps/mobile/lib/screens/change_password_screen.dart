@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'driver_trips_screen.dart';
-import 'trips_screen.dart';
+import 'owner_home_screen.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key, required this.apiService, required this.userRole});
@@ -45,13 +45,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       } else {
         Navigator.pushReplacement(
           context,
-            MaterialPageRoute(
-              builder: (_) => TripsScreen(
-                apiService: widget.apiService,
-                userRole: widget.userRole,
-              ),
-            ),
-          );
+          MaterialPageRoute(
+            builder: (_) => OwnerHomeScreen(apiService: widget.apiService),
+          ),
+        );
       }
     } catch (e) {
       if (!mounted) return;

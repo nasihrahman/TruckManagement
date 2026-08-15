@@ -19,11 +19,13 @@ export class TrucksController {
   }
 
   @Get()
+  @Roles(Role.OWNER, Role.DRIVER)
   async findAll(@Request() req: any) {
     return this.trucksService.findAll(req.user.companyId);
   }
 
   @Get(':id')
+  @Roles(Role.OWNER, Role.DRIVER)
   async findOne(@Request() req: any, @Param('id') id: string) {
     return this.trucksService.findOne(id, req.user.companyId);
   }

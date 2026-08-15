@@ -1,16 +1,21 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { TripsRepository } from './trips.repository';
 import { Trip, TripStatus, Prisma } from '@prisma/client';
+import * as ExcelJS from 'exceljs';
 
 @Injectable()
 export class TripsService {
   constructor(private readonly tripsRepository: TripsRepository) {}
 
-  async create(companyId: string, payload: Prisma.TripUncheckedCreateInput): Promise<Trip> {
-    return this.tripsRepository.create({ ...payload, companyId });
+  async create(
+    user: { userId: string; role: string; companyId: string },
+    payload: Prisma.TripUncheckedCreateInput,
+  ): Promise<Trip> {
+    const driverId = user.role === 'DRIVER' ? user.userId : payload.driverId;
+    return this.tripsRepository.create({ ...payload, driverId, companyId: user.companyId });
   }
 
-  async findByCompany(companyId: string, userId?: string, role?: string): Promise<Trip[]> {
+  async findByCompany(companyId: string, userId?: string, role?: string) {
     if (role === 'DRIVER' && userId) {
       return this.tripsRepository.findByCompanyAndDriver(companyId, userId);
     }
@@ -26,7 +31,7 @@ export class TripsService {
   async update(
     id: string,
     companyId: string,
-    data: { origin?: string; destination?: string; scheduledAt?: string; truckId?: string; driverId?: string },
+    data: { origin?: string; destination?: string; scheduledAt?: Date; truckId?: string; driverId?: string },
   ) {
     const trip = await this.findById(id);
     if (trip.companyId !== companyId) throw new ForbiddenException();
@@ -56,10 +61,85 @@ export class TripsService {
     return this.tripsRepository.updateStatus(id, status);
   }
 
+  async remove(id: string, user: { userId: string; role: string; companyId: string }): Promise<void> {
+    const trip = await this.findById(id);
+    if (trip.companyId !== user.companyId) throw new ForbiddenException();
+
+    if (user.role === 'DRIVER') {
+      if (!trip.driverId || trip.driverId !== user.userId) {
+        throw new ForbiddenException('Driver not assigned to this trip');
+      }
+      if (trip.status !== 'ASSIGNED') {
+        throw new BadRequestException('Only assigned trips can be deleted');
+      }
+    }
+
+    await this.tripsRepository.remove(id);
+  }
+
   async setFinanciallyClosed(id: string, companyId: string, financiallyClosed: boolean): Promise<Trip> {
     const trip = await this.findById(id);
     if (trip.companyId !== companyId) throw new ForbiddenException();
 
     return this.tripsRepository.setFinanciallyClosed(id, financiallyClosed);
+  }
+
+  async exportToExcel(companyId: string): Promise<Buffer> {
+    const trips = await this.tripsRepository.findByCompanyForExport(companyId);
+
+    const groups = new Map<string, { name: string; trips: typeof trips }>();
+    for (const trip of trips) {
+      const key = trip.driver?.id ?? 'unassigned';
+      const name = trip.driver
+        ? [trip.driver.firstName, trip.driver.lastName].filter(Boolean).join(' ') || 'Driver'
+        : 'Unassigned';
+      if (!groups.has(key)) groups.set(key, { name, trips: [] });
+      groups.get(key)!.trips.push(trip);
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const columns = [
+      { header: 'Origin', key: 'origin', width: 20 },
+      { header: 'Destination', key: 'destination', width: 20 },
+      { header: 'Truck', key: 'truck', width: 20 },
+      { header: 'Delivery Date', key: 'scheduledAt', width: 16 },
+      { header: 'Status', key: 'status', width: 14 },
+      { header: 'Started At', key: 'startedAt', width: 18 },
+      { header: 'Delivered / Failed On', key: 'completedAt', width: 18 },
+    ];
+
+    const usedNames = new Set<string>();
+    for (const { name, trips: driverTrips } of groups.values()) {
+      let sheetName = name.replace(/[*?:/\\[\]]/g, ' ').trim().slice(0, 31) || 'Driver';
+      let suffix = 2;
+      while (usedNames.has(sheetName)) {
+        sheetName = `${sheetName.slice(0, 28)} (${suffix++})`;
+      }
+      usedNames.add(sheetName);
+
+      const sheet = workbook.addWorksheet(sheetName);
+      sheet.columns = columns;
+      sheet.getRow(1).font = { bold: true };
+
+      for (const trip of driverTrips) {
+        sheet.addRow({
+          origin: trip.origin,
+          destination: trip.destination,
+          truck: trip.truck ? [trip.truck.plate, trip.truck.brand].filter(Boolean).join(' · ') : 'Unassigned',
+          scheduledAt: trip.scheduledAt ? trip.scheduledAt.toISOString().slice(0, 10) : '',
+          status: trip.status,
+          startedAt: trip.startedAt ? trip.startedAt.toISOString().slice(0, 16).replace('T', ' ') : '',
+          completedAt: trip.completedAt ? trip.completedAt.toISOString().slice(0, 16).replace('T', ' ') : '',
+        });
+      }
+    }
+
+    if (workbook.worksheets.length === 0) {
+      const sheet = workbook.addWorksheet('Trips');
+      sheet.columns = columns;
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 }

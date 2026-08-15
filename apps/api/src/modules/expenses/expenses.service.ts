@@ -23,9 +23,21 @@ export class ExpensesService {
   async create(tripId: string, user: RequestUser, dto: CreateExpenseDto): Promise<Expense> {
     const trip = await this.getTripForCompany(tripId, user.companyId);
 
-    if (user.role !== 'DRIVER' || trip.driverId !== user.userId) {
-      throw new ForbiddenException('Only the driver assigned to this trip can log expenses');
+    let driverId: string;
+    if (user.role === 'DRIVER') {
+      if (trip.driverId !== user.userId) {
+        throw new ForbiddenException('Driver not assigned to this trip');
+      }
+      driverId = user.userId;
+    } else if (user.role === 'OWNER') {
+      if (!trip.driverId) {
+        throw new BadRequestException('Assign a driver to this trip before logging expenses');
+      }
+      driverId = trip.driverId;
+    } else {
+      throw new ForbiddenException('Not allowed to log expenses for this trip');
     }
+
     if (trip.financiallyClosed) {
       throw new BadRequestException('Trip is financially closed and no longer accepts expenses');
     }
@@ -33,7 +45,7 @@ export class ExpensesService {
     return this.expensesRepository.create({
       tripId,
       companyId: user.companyId,
-      driverId: user.userId,
+      driverId,
       category: dto.category,
       amount: dto.amount,
       photoUrl: dto.photoUrl,
@@ -59,8 +71,9 @@ export class ExpensesService {
     const expense = await this.expensesRepository.findById(expenseId);
     if (!expense || expense.tripId !== tripId) throw new NotFoundException('Expense not found');
 
-    if (user.role !== 'DRIVER' || trip.driverId !== user.userId || expense.driverId !== user.userId) {
-      throw new ForbiddenException('Only the driver who logged this expense can edit it');
+    const isAssignedDriver = user.role === 'DRIVER' && trip.driverId === user.userId && expense.driverId === user.userId;
+    if (user.role !== 'OWNER' && !isAssignedDriver) {
+      throw new ForbiddenException('Not allowed to edit this expense');
     }
     if (trip.financiallyClosed) {
       throw new BadRequestException('Trip is financially closed and expenses can no longer be edited');
@@ -82,8 +95,9 @@ export class ExpensesService {
     const expense = await this.expensesRepository.findById(expenseId);
     if (!expense || expense.tripId !== tripId) throw new NotFoundException('Expense not found');
 
-    if (user.role !== 'DRIVER' || trip.driverId !== user.userId || expense.driverId !== user.userId) {
-      throw new ForbiddenException('Only the driver who logged this expense can delete it');
+    const isAssignedDriver = user.role === 'DRIVER' && trip.driverId === user.userId && expense.driverId === user.userId;
+    if (user.role !== 'OWNER' && !isAssignedDriver) {
+      throw new ForbiddenException('Not allowed to delete this expense');
     }
     if (trip.financiallyClosed) {
       throw new BadRequestException('Trip is financially closed and expenses can no longer be deleted');

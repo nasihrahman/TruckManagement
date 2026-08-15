@@ -5,11 +5,14 @@ import '../models/truck.dart';
 import '../services/api_service.dart';
 
 class TripFormScreen extends StatefulWidget {
-  const TripFormScreen({super.key, required this.apiService, this.existing});
+  const TripFormScreen({super.key, required this.apiService, this.existing, this.selfAssignDriverId});
 
   final ApiService apiService;
   /// null = create mode, non-null = edit mode (pre-filled, PATCHes on submit).
   final Trip? existing;
+  /// When set (a Driver creating their own trip), the driver dropdown is hidden
+  /// and the trip is always assigned to this id.
+  final String? selfAssignDriverId;
 
   @override
   State<TripFormScreen> createState() => _TripFormScreenState();
@@ -21,6 +24,7 @@ class _TripFormScreenState extends State<TripFormScreen> {
   late final TextEditingController _destinationController;
   String? _selectedDriverId;
   String? _selectedTruckId;
+  DateTime? _deliveryDate;
   bool _isLoading = false;
   bool _isLoadingResources = true;
   List<Driver> _drivers = [];
@@ -33,8 +37,9 @@ class _TripFormScreenState extends State<TripFormScreen> {
     super.initState();
     _originController = TextEditingController(text: widget.existing?.origin ?? '');
     _destinationController = TextEditingController(text: widget.existing?.destination ?? '');
-    _selectedDriverId = widget.existing?.driverId;
+    _selectedDriverId = widget.selfAssignDriverId ?? widget.existing?.driverId;
     _selectedTruckId = widget.existing?.truckId;
+    _deliveryDate = widget.existing?.scheduledAt;
     _loadResources();
   }
 
@@ -48,20 +53,46 @@ class _TripFormScreenState extends State<TripFormScreen> {
   Future<void> _loadResources() async {
     setState(() => _isLoadingResources = true);
     try {
-      final results = await Future.wait([
-        widget.apiService.fetchDrivers(),
-        widget.apiService.fetchTrucks(),
-      ]);
-      setState(() {
-        _drivers = results[0] as List<Driver>;
-        _trucks = results[1] as List<Truck>;
-      });
+      if (widget.selfAssignDriverId != null) {
+        final results = await Future.wait([
+          widget.apiService.fetchTrucks(),
+          widget.apiService.fetchMyDriverProfile(),
+        ]);
+        final trucks = results[0] as List<Truck>;
+        final profile = results[1] as Map<String, dynamic>;
+        setState(() {
+          _trucks = trucks;
+          _selectedTruckId ??= profile['defaultTruckId']?.toString();
+        });
+      } else {
+        final results = await Future.wait([
+          widget.apiService.fetchDrivers(),
+          widget.apiService.fetchTrucks(),
+        ]);
+        setState(() {
+          _drivers = results[0] as List<Driver>;
+          _trucks = results[1] as List<Truck>;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _isLoadingResources = false);
     }
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+
+  Future<void> _pickDeliveryDateFromCalendar() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _deliveryDate ?? now,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 2),
+    );
+    if (picked != null) setState(() => _deliveryDate = DateTime.utc(picked.year, picked.month, picked.day));
   }
 
   Future<void> _submit() async {
@@ -77,6 +108,7 @@ class _TripFormScreenState extends State<TripFormScreen> {
           destination: _destinationController.text,
           driverId: _selectedDriverId,
           truckId: _selectedTruckId,
+          scheduledAt: _deliveryDate,
         );
       } else {
         savedTrip = await widget.apiService.createTrip(
@@ -84,6 +116,7 @@ class _TripFormScreenState extends State<TripFormScreen> {
           destination: _destinationController.text,
           driverId: _selectedDriverId,
           truckId: _selectedTruckId,
+          scheduledAt: _deliveryDate,
         );
       }
       if (!mounted) return;
@@ -120,25 +153,27 @@ class _TripFormScreenState extends State<TripFormScreen> {
                       decoration: const InputDecoration(labelText: 'Destination'),
                       validator: (value) => value == null || value.isEmpty ? 'Enter destination' : null,
                     ),
-                    const SizedBox(height: 20),
-                    const Text('Driver', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedDriverId,
-                      isExpanded: true,
-                      decoration: const InputDecoration(border: OutlineInputBorder()),
-                      hint: const Text('Unassigned'),
-                      items: _drivers
-                          .map((d) => DropdownMenuItem<String>(value: d.id, child: Text(d.name)))
-                          .toList(),
-                      onChanged: (val) => setState(() {
-                        _selectedDriverId = val;
-                        final matches = _drivers.where((d) => d.id == val);
-                        if (matches.isNotEmpty && matches.first.defaultTruckId != null) {
-                          _selectedTruckId = matches.first.defaultTruckId;
-                        }
-                      }),
-                    ),
+                    if (widget.selfAssignDriverId == null) ...[
+                      const SizedBox(height: 20),
+                      const Text('Driver', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedDriverId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(border: OutlineInputBorder()),
+                        hint: const Text('Unassigned'),
+                        items: _drivers
+                            .map((d) => DropdownMenuItem<String>(value: d.id, child: Text(d.name)))
+                            .toList(),
+                        onChanged: (val) => setState(() {
+                          _selectedDriverId = val;
+                          final matches = _drivers.where((d) => d.id == val);
+                          if (matches.isNotEmpty && matches.first.defaultTruckId != null) {
+                            _selectedTruckId = matches.first.defaultTruckId;
+                          }
+                        }),
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     const Text('Truck', style: TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
@@ -155,6 +190,41 @@ class _TripFormScreenState extends State<TripFormScreen> {
                           .toList(),
                       onChanged: (val) => setState(() => _selectedTruckId = val),
                     ),
+                    const SizedBox(height: 20),
+                    const Text('Delivery Date', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Builder(builder: (context) {
+                      final now = DateTime.now();
+                      final today = DateTime.utc(now.year, now.month, now.day);
+                      final tomorrow = today.add(const Duration(days: 1));
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Today'),
+                            selected: _deliveryDate != null && _isSameDay(_deliveryDate!, today),
+                            onSelected: (_) => setState(() => _deliveryDate = today),
+                          ),
+                          ChoiceChip(
+                            label: const Text('Tomorrow'),
+                            selected: _deliveryDate != null && _isSameDay(_deliveryDate!, tomorrow),
+                            onSelected: (_) => setState(() => _deliveryDate = tomorrow),
+                          ),
+                          ActionChip(
+                            avatar: const Icon(Icons.calendar_month, size: 18),
+                            label: Text(
+                              _deliveryDate != null &&
+                                      !_isSameDay(_deliveryDate!, today) &&
+                                      !_isSameDay(_deliveryDate!, tomorrow)
+                                  ? '${_deliveryDate!.year}-${_deliveryDate!.month.toString().padLeft(2, '0')}-${_deliveryDate!.day.toString().padLeft(2, '0')}'
+                                  : 'Choose Date',
+                            ),
+                            onPressed: _pickDeliveryDateFromCalendar,
+                          ),
+                        ],
+                      );
+                    }),
                     const SizedBox(height: 28),
                     FilledButton(
                       onPressed: _isLoading ? null : _submit,

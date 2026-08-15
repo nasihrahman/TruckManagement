@@ -73,10 +73,22 @@ describe('ExpensesService', () => {
       await expect(service.create('trip-1', otherDriverUser, dto)).rejects.toThrow(ForbiddenException);
     });
 
-    it('throws ForbiddenException for an Owner trying to log an expense', async () => {
+    it('lets the Owner log an expense on behalf of the assigned driver', async () => {
       mockTripsRepository.findById.mockResolvedValue(openTrip);
+      mockExpensesRepository.create.mockResolvedValue({ id: 'expense-1', driverId: 'driver-1', ...dto });
 
-      await expect(service.create('trip-1', ownerUser, dto)).rejects.toThrow(ForbiddenException);
+      const result = await service.create('trip-1', ownerUser, dto);
+
+      expect(mockExpensesRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ tripId: 'trip-1', driverId: 'driver-1', companyId: 'company-1' }),
+      );
+      expect(result.driverId).toBe('driver-1');
+    });
+
+    it('throws BadRequestException if the Owner logs an expense on a trip with no assigned driver', async () => {
+      mockTripsRepository.findById.mockResolvedValue({ ...openTrip, driverId: null });
+
+      await expect(service.create('trip-1', ownerUser, dto)).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException if the trip is financially closed', async () => {
@@ -128,6 +140,16 @@ describe('ExpensesService', () => {
       await expect(service.update('trip-1', 'expense-1', driverUser, { amount: 75 })).rejects.toThrow(ForbiddenException);
     });
 
+    it('lets the Owner edit any expense on a trip in their company', async () => {
+      mockTripsRepository.findById.mockResolvedValue(openTrip);
+      mockExpensesRepository.findById.mockResolvedValue(existingExpense);
+      mockExpensesRepository.update.mockResolvedValue({ ...existingExpense, amount: 90 });
+
+      const result = await service.update('trip-1', 'expense-1', ownerUser, { amount: 90 });
+
+      expect(result.amount).toBe(90);
+    });
+
     it('throws NotFoundException if the expense does not belong to the given trip', async () => {
       mockTripsRepository.findById.mockResolvedValue(openTrip);
       mockExpensesRepository.findById.mockResolvedValue({ ...existingExpense, tripId: 'trip-other' });
@@ -161,6 +183,16 @@ describe('ExpensesService', () => {
       mockExpensesRepository.findById.mockResolvedValue({ ...existingExpense, driverId: 'driver-2' });
 
       await expect(service.delete('trip-1', 'expense-1', driverUser)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('lets the Owner delete any expense on a trip in their company', async () => {
+      mockTripsRepository.findById.mockResolvedValue(openTrip);
+      mockExpensesRepository.findById.mockResolvedValue(existingExpense);
+      mockExpensesRepository.delete.mockResolvedValue(existingExpense);
+
+      await service.delete('trip-1', 'expense-1', ownerUser);
+
+      expect(mockExpensesRepository.delete).toHaveBeenCalledWith('expense-1');
     });
 
     it('throws NotFoundException if the expense does not belong to the given trip', async () => {

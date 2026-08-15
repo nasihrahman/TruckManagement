@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/trip.dart';
@@ -75,6 +76,7 @@ class ApiService {
     required String destination,
     String? driverId,
     String? truckId,
+    DateTime? scheduledAt,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/trips'),
@@ -84,6 +86,7 @@ class ApiService {
         'destination': destination,
         if (driverId != null) 'driverId': driverId,
         if (truckId != null) 'truckId': truckId,
+        if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
       }),
     );
     final body = jsonDecode(response.body);
@@ -99,6 +102,7 @@ class ApiService {
     String? destination,
     String? driverId,
     String? truckId,
+    DateTime? scheduledAt,
   }) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/trips/$tripId'),
@@ -108,6 +112,7 @@ class ApiService {
         if (destination != null) 'destination': destination,
         if (driverId != null) 'driverId': driverId,
         if (truckId != null) 'truckId': truckId,
+        if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
       }),
     );
     final body = jsonDecode(response.body);
@@ -128,6 +133,17 @@ class ApiService {
       throw Exception(body['message'] ?? 'Failed to update trip status');
     }
     return Trip.fromJson(body);
+  }
+
+  Future<void> deleteTrip(String tripId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/trips/$tripId'),
+      headers: await _headers(auth: true),
+    );
+    if (response.statusCode >= 400) {
+      final body = jsonDecode(response.body);
+      throw Exception(body['message'] ?? 'Failed to delete trip');
+    }
   }
 
   Future<List<Driver>> fetchDrivers() async {
@@ -289,6 +305,42 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> fetchMyDriverProfile() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/drivers/me'),
+      headers: await _headers(auth: true),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Unable to load profile');
+    }
+    return body as Map<String, dynamic>;
+  }
+
+  Future<void> pingLocation(double latitude, double longitude) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/drivers/me/location'),
+      headers: await _headers(auth: true),
+      body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
+    );
+    if (response.statusCode >= 400) {
+      final body = jsonDecode(response.body);
+      throw Exception(body['message'] ?? 'Failed to send location');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchOnlineLocations() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/drivers/online-locations'),
+      headers: await _headers(auth: true),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception('Unable to load online drivers');
+    }
+    return (body as List).cast<Map<String, dynamic>>();
+  }
+
   Future<void> changePassword(String newPassword) async {
     final response = await http.post(
       Uri.parse('$baseUrl/auth/change-password'),
@@ -299,6 +351,17 @@ class ApiService {
       final body = jsonDecode(response.body);
       throw Exception(body['message'] ?? 'Failed to update password');
     }
+  }
+
+  Future<Uint8List> exportTripsExcel() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/trips/export.xlsx'),
+      headers: await _headers(auth: true),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception('Unable to export trips');
+    }
+    return response.bodyBytes;
   }
 
   Future<List<Expense>> fetchExpenses(String tripId) async {

@@ -14,12 +14,22 @@ export class TripsRepository {
     return this.prisma.trip.findUnique({ where: { id } });
   }
 
-  async findByCompany(companyId: string): Promise<Trip[]> {
-    return this.prisma.trip.findMany({ where: { companyId } });
+  async findByCompany(companyId: string) {
+    return this.prisma.trip.findMany({
+      where: { companyId },
+      orderBy: { createdAt: 'desc' },
+      include: { expenses: { select: { amount: true, category: true, createdAt: true } } },
+    });
   }
 
   async updateStatus(id: string, status: TripStatus): Promise<Trip> {
-    return this.prisma.trip.update({ where: { id }, data: { status } });
+    const data: Prisma.TripUpdateInput = { status };
+    if (status === 'IN_TRANSIT') {
+      data.startedAt = new Date();
+    } else if (status === 'DELIVERED' || status === 'FAILED') {
+      data.completedAt = new Date();
+    }
+    return this.prisma.trip.update({ where: { id }, data });
   }
 
   async setFinanciallyClosed(id: string, financiallyClosed: boolean): Promise<Trip> {
@@ -30,11 +40,38 @@ export class TripsRepository {
     return this.prisma.trip.update({ where: { id }, data });
   }
 
-  async findByCompanyAndDriver(companyId: string, driverId: string): Promise<Trip[]> {
+  async findByCompanyAndDriver(companyId: string, driverId: string) {
     return this.prisma.trip.findMany({
       where: {
         companyId,
         driverId,
+      },
+      orderBy: { createdAt: 'desc' },
+      include: { expenses: { select: { amount: true, category: true, createdAt: true } } },
+    });
+  }
+
+  async findActiveTripForDriver(driverId: string): Promise<Trip | null> {
+    return this.prisma.trip.findFirst({ where: { driverId, status: 'IN_TRANSIT' } });
+  }
+
+  async remove(id: string): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.expense.deleteMany({ where: { tripId: id } }),
+      this.prisma.fuelReceipt.updateMany({ where: { tripId: id }, data: { tripId: null } }),
+      this.prisma.issue.updateMany({ where: { tripId: id }, data: { tripId: null } }),
+      this.prisma.locationPing.updateMany({ where: { tripId: id }, data: { tripId: null } }),
+      this.prisma.trip.delete({ where: { id } }),
+    ]);
+  }
+
+  async findByCompanyForExport(companyId: string) {
+    return this.prisma.trip.findMany({
+      where: { companyId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        driver: { select: { id: true, firstName: true, lastName: true } },
+        truck: { select: { plate: true, brand: true } },
       },
     });
   }

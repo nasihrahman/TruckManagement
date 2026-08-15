@@ -6,11 +6,18 @@ import { Role } from '@prisma/client';
 import { DriversService } from './drivers.service';
 import { CreateDriverDto } from './dto/create-driver.dto';
 import { UpdateDriverDto } from './dto/update-driver.dto';
+import { LocationPingDto } from './dto/location-ping.dto';
 
 @Controller('drivers')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class DriversController {
   constructor(private readonly driversService: DriversService) {}
+
+  @Get('me')
+  @Roles(Role.DRIVER)
+  async me(@Request() req: any) {
+    return this.driversService.getOwnProfile(req.user.userId, req.user.companyId);
+  }
 
   @Post('me/go-online')
   @Roles(Role.DRIVER)
@@ -22,6 +29,18 @@ export class DriversController {
   @Roles(Role.DRIVER)
   async goOffline(@Request() req: any) {
     return this.driversService.goOffline(req.user.userId, req.user.companyId);
+  }
+
+  @Post('me/location')
+  @Roles(Role.DRIVER)
+  async pingLocation(@Request() req: any, @Body() dto: LocationPingDto) {
+    return this.driversService.recordLocation(req.user.userId, req.user.companyId, dto);
+  }
+
+  @Get('online-locations')
+  @Roles(Role.OWNER)
+  async onlineLocations(@Request() req: any) {
+    return this.driversService.getOnlineLocations(req.user.companyId);
   }
 
   @Get()

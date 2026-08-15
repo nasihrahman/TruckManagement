@@ -155,4 +155,28 @@ export class DriversRepository {
       data: { endedAt: new Date() },
     });
   }
+
+  async createLocationPing(data: {
+    driverId: string;
+    companyId: string;
+    tripId: string | null;
+    latitude: number;
+    longitude: number;
+  }) {
+    return this.prisma.locationPing.create({ data });
+  }
+
+  async getOnlineShifts(companyId: string) {
+    return this.prisma.driverShift.findMany({
+      where: { companyId, endedAt: null },
+      include: { driver: { select: { id: true, firstName: true, lastName: true } } },
+    });
+  }
+
+  async getLatestPing(driverId: string) {
+    return this.prisma.locationPing.findFirst({
+      where: { driverId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }

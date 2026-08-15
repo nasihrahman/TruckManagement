@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DriversService } from './drivers.service';
 import { DriversRepository } from './drivers.repository';
 import { TrucksService } from '../trucks/trucks.service';
+import { TripsRepository } from '../trips/trips.repository';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 
@@ -18,10 +19,20 @@ describe('DriversService', () => {
     findByCompany: jest.fn(),
     deactivateDriver: jest.fn(),
     reactivateDriver: jest.fn(),
+    getActiveShift: jest.fn(),
+    createShift: jest.fn(),
+    endShift: jest.fn(),
+    createLocationPing: jest.fn(),
+    getOnlineShifts: jest.fn(),
+    getLatestPing: jest.fn(),
   };
 
   const mockTrucksService = {
     findOne: jest.fn(),
+  };
+
+  const mockTripsRepository = {
+    findActiveTripForDriver: jest.fn(),
   };
 
   const mockUser = {
@@ -46,6 +57,7 @@ describe('DriversService', () => {
         DriversService,
         { provide: DriversRepository, useValue: mockRepository },
         { provide: TrucksService, useValue: mockTrucksService },
+        { provide: TripsRepository, useValue: mockTripsRepository },
       ],
     }).compile();
 

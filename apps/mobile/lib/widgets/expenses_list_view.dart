@@ -15,8 +15,7 @@ class ExpensesListView extends StatefulWidget {
   final ApiService apiService;
   final String tripId;
   final bool financiallyClosed;
-  /// When true (e.g. the Owner viewing a trip), hides edit/delete controls —
-  /// only the driver who logged an expense may edit or delete it.
+  /// When true, hides edit/delete/add controls entirely (view-only display).
   final bool readOnly;
 
   @override

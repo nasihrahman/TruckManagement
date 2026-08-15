@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import 'trips_screen.dart';
+import 'owner_home_screen.dart';
 import 'change_password_screen.dart';
 import 'driver_trips_screen.dart';
 
@@ -48,10 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => TripsScreen(
-                apiService: widget.apiService,
-                userRole: loginResult['role'],
-              ),
+              builder: (_) => OwnerHomeScreen(apiService: widget.apiService),
             ),
           );
         }

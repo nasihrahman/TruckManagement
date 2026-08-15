@@ -1,41 +1,40 @@
 import 'package:flutter/material.dart';
 import '../models/trip.dart';
 import '../services/api_service.dart';
-import 'drivers_screen.dart';
-import 'trucks_screen.dart';
-import 'trip_form_screen.dart';
 import 'owner_trip_detail_screen.dart';
 
 class TripsScreen extends StatefulWidget {
-  const TripsScreen({super.key, required this.apiService, this.userRole});
+  const TripsScreen({super.key, required this.apiService, required this.onLogout, this.userRole});
   final ApiService apiService;
+  final VoidCallback onLogout;
   final String? userRole;
 
   @override
-  State<TripsScreen> createState() => _TripsScreenState();
+  State<TripsScreen> createState() => TripsScreenState();
 }
 
-class _TripsScreenState extends State<TripsScreen> {
+class TripsScreenState extends State<TripsScreen> {
   late Future<List<Trip>> _tripsFuture;
+  final _searchController = TextEditingController();
+  String _statusFilter = 'ALL';
 
   @override
   void initState() {
     super.initState();
     _tripsFuture = widget.apiService.fetchTrips();
+    _searchController.addListener(() => setState(() {}));
   }
 
-  Future<void> _refreshTrips() async {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> refreshTrips() async {
     setState(() {
       _tripsFuture = widget.apiService.fetchTrips();
     });
-  }
-
-  Future<void> _createTrip() async {
-    final created = await Navigator.push<Trip>(
-      context,
-      MaterialPageRoute(builder: (_) => TripFormScreen(apiService: widget.apiService)),
-    );
-    if (created != null) _refreshTrips();
   }
 
   Future<void> _openTripDetail(Trip trip) async {
@@ -45,7 +44,16 @@ class _TripsScreenState extends State<TripsScreen> {
         builder: (context) => OwnerTripDetailScreen(apiService: widget.apiService, trip: trip),
       ),
     );
-    if (res == true) _refreshTrips();
+    if (res == true) refreshTrips();
+  }
+
+  List<Trip> _applyFilters(List<Trip> trips) {
+    final query = _searchController.text.trim().toLowerCase();
+    return trips.where((t) {
+      if (_statusFilter != 'ALL' && t.status != _statusFilter) return false;
+      if (query.isEmpty) return true;
+      return t.origin.toLowerCase().contains(query) || t.destination.toLowerCase().contains(query);
+    }).toList();
   }
 
   @override
@@ -54,80 +62,80 @@ class _TripsScreenState extends State<TripsScreen> {
       appBar: AppBar(
         title: const Text('Trips'),
         actions: [
-          if (widget.userRole == 'OWNER')
-            IconButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => TrucksScreen(apiService: widget.apiService),
-                  ),
+          IconButton(onPressed: refreshTrips, icon: const Icon(Icons.refresh)),
+          IconButton(onPressed: widget.onLogout, icon: const Icon(Icons.logout)),
+        ],
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search trips',
+                prefixIcon: const Icon(Icons.search),
+                isDense: true,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final status in const ['ALL', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'FAILED'])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(status == 'ALL' ? 'All' : status),
+                        selected: _statusFilter == status,
+                        onSelected: (_) => setState(() => _statusFilter = status),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: FutureBuilder<List<Trip>>(
+              future: _tripsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(child: Text(snapshot.error.toString()));
+                }
+                final trips = _applyFilters(snapshot.data ?? []);
+                if (trips.isEmpty) {
+                  return const Center(child: Text('No trips match'));
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  itemCount: trips.length,
+                  itemBuilder: (context, index) {
+                    final trip = trips[index];
+                    return Card(
+                      child: ListTile(
+                        title: Text('${trip.origin} → ${trip.destination}'),
+                        subtitle: Text(
+                          'Status: ${trip.status} · Expenses: ₹${trip.expenseTotal.toStringAsFixed(2)}',
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _openTripDetail(trip),
+                      ),
+                    );
+                  },
                 );
               },
-              icon: const Icon(Icons.local_shipping),
             ),
-          if (widget.userRole == 'OWNER')
-            IconButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DriversScreen(apiService: widget.apiService),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.people),
-            ),
-          IconButton(onPressed: _refreshTrips, icon: const Icon(Icons.refresh)),
-          IconButton(
-            onPressed: () async {
-              await widget.apiService.clearToken();
-              if (!mounted) return;
-              Navigator.pop(context);
-            },
-            icon: const Icon(Icons.logout),
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: FutureBuilder<List<Trip>>(
-          future: _tripsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(child: Text(snapshot.error.toString()));
-            }
-            final trips = snapshot.data ?? [];
-            if (trips.isEmpty) {
-              return const Center(child: Text('No trips yet'));
-            }
-            return ListView.builder(
-              itemCount: trips.length,
-              itemBuilder: (context, index) {
-                final trip = trips[index];
-                return Card(
-                  child: ListTile(
-                    title: Text('${trip.origin} → ${trip.destination}'),
-                    subtitle: Text('Status: ${trip.status}'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: widget.userRole == 'OWNER' ? () => _openTripDetail(trip) : null,
-                  ),
-                );
-              },
-            );
-          },
-        ),
-      ),
-      floatingActionButton: widget.userRole == 'OWNER'
-          ? FloatingActionButton.extended(
-              onPressed: _createTrip,
-              icon: const Icon(Icons.add),
-              label: const Text('Create Trip'),
-            )
-          : null,
     );
   }
 }

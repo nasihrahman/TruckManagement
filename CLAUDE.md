@@ -16,10 +16,16 @@
 10. **Quarterly reporting is deferred**, not built — period resolver must still be structured so it's a one-line addition later.
 11. **Flutter Driver home screen redesign (supersedes Step 6/7 UI as built)**: the slide-to-start/end control and the expense list/entry no longer live inline on the "My Trips" list. Home screen shows completed trips plus the current assigned/in-progress trip as a single tappable card — the card itself is tap-to-open, not inline-actionable. Tapping it opens a **Trip Detail** screen that consolidates: the slide-to-start/end control (pinned to the bottom of the screen), this trip's expense list, and an "Add Expense" button. Completed trips are tappable too (same Trip Detail screen, no slide control) so a driver can still add/edit expenses after delivery — expenses lock on `financiallyClosed`, not delivery status. Implemented 2026-08-09.
 12. **Double-booking guard removed (reverses the original Trip Assignment spec).** Owner can assign any driver/truck to any trip regardless of whether that resource is already on another active trip — no error, no confirmation prompt. `isResourceBusy` and the "driver/truck currently on an active trip" exception are gone from the backend entirely. Flutter Owner flow consolidated: **one Trip Form screen** (origin, destination, driver dropdown, truck dropdown) handles both create (`POST /trips`) and edit (`PATCH /trips/:id`, replaces the old `/trips/:id/assign` endpoint) — trips are fully editable after creation via the same form, reached via an Edit action on the trip's detail screen. The Owner's trip detail screen (tapping a trip card) shows driver/truck assignment, a read-only live expense view (reusing the same `ExpensesListView` the driver uses, edit/delete hidden), and a placeholder section for live location — actual tracking is deferred until Duty Status/Location steps (8-11) are built. Implemented 2026-08-09.
+13. **Truck management, default truck, delivery date, and a standalone trips export were added ahead of the numbered Build Order** (all additive, no earlier override reversed). Owner-only **Trucks tab**: add/edit truck with `plate` (Truck Number), `brand`, optional `vin`. **Driver now has `defaultTruckId`**, set from the Add/Edit Driver form (new `PATCH /drivers/:id` endpoint — driver editing didn't exist before this); selecting a driver in the Trip Form pre-fills the Truck dropdown from that driver's default, still freely changeable. **Delivery date**: the `Trip.scheduledAt` column (present in schema since Trip Assignment was first built, never previously exposed) is now surfaced in the Trip Form as "Delivery Date" — Today/Tomorrow quick-picks plus a full calendar — and shown on both trip detail screens. **Actual delivery recording**: `Trip.startedAt`/`completedAt` (also long-present, previously never written) are now set automatically on the ASSIGNED→IN_TRANSIT and →DELIVERED/FAILED status transitions, and displayed as "Delivered/Failed on" on the trip detail screens. **Excel export**: `GET /trips/export.xlsx` (Owner-only, `exceljs`) — one worksheet per driver (origin, destination, truck, delivery date, status, started/completed timestamps), "Unassigned" sheet for trips with no driver. This is deliberately a separate, standalone exporter from the Financial Reporting workbook in Build Order step 17 — do not merge them; step 17's consolidated workbook is still a distinct, much larger piece of work (Sales/Expenses/Orders/Driver Expenses, gated on the Orders module and the revenue-tracking Open Decision). Implemented 2026-08-11.
+14. **Owner Dashboard tab + bottom-tab shell added ahead of the numbered Build Order** (client request, additive). Owner navigation is now a two-tab bottom bar (Dashboard / Trips) with a centered **+** quick-actions FAB between them (Create Trip / Add Driver / Add Truck). Dashboard shows: fleet counts (tap-through to full lists), trip counts by status, Due Today/Due Tomorrow/Overdue lists (from `scheduledAt`), a weekly expense pulse (Fuel/Fine/Other breakdown), unclosed/failed trip counts, the Excel export button, and the Online Drivers list (Override 16). Trip cards on the Trips tab show each trip's expense total. **Owner can also act on a driver's behalf**: `ExpensesService.create/update/delete` now allow `OWNER` (attributed to the trip's assigned driver, not the Owner, so driver-expense reporting stays correct — `BadRequestException` if the trip has no driver yet), and the Owner trip detail screen has "Mark Delivered"/"Mark Failed" buttons (visible only while `IN_TRANSIT`, confirmation dialog first) for when a driver doesn't record it themselves. Implemented 2026-08-15.
+15. **Driver self-assign trips (client request, reverses "Owner-only" assumption in the original Trip Assignment spec).** A Driver might be unavailable to receive an Owner-assigned trip, so Drivers can now create their own: `POST /trips` accepts `Role.DRIVER` in addition to `Role.OWNER`; when a Driver creates a trip, `TripsService.create` **forces `driverId` to the caller's own id** server-side regardless of what's in the request body (a driver can never assign a trip to someone else). The Trip Form hides the driver dropdown entirely in this mode (`TripFormScreen(selfAssignDriverId: ...)`) and pre-fills the truck from the driver's own `defaultTruckId` via a new self-service `GET /drivers/me` endpoint (also returns `isOnline`). `GET /trucks` (list + get-by-id) is now readable by `DRIVER` too (was Owner-only), since the self-assign form needs the truck dropdown. Trip editing (`PATCH /trips/:id`) stays Owner-only — this override is create-only. Implemented 2026-08-15.
+16. **Duty Status + location tracking wired up (Build Order steps 8-11), foreground-only for now.** The `DriverShift` table and `go-online`/`go-offline` endpoints already existed from earlier scaffolding (unused until now) — the new work is `POST /drivers/me/location` (Driver-only ping, requires an active shift, attaches the driver's current `IN_TRANSIT` trip id if any) and `GET /drivers/online-locations` (Owner-only, latest ping per online driver). Flutter Driver home screen has an Online/Offline `Switch`; going online starts a `Timer.periodic` 60s ping loop using the `geolocator` package (works on both Chrome/web and Android — same code, no platform branching needed) and sends one ping immediately rather than waiting for the first tick. **This is foreground-only** — tracking stops if the app is closed or backgrounded, because there is no real background/foreground-service implementation yet (that needs `flutter_background_service`/`workmanager` + an Android foreground-service notification, a distinct follow-up step). Owner's "map" (step 11) is deliberately a lightweight text list on the Dashboard (name, green dot, "Xm ago"), not `flutter_map`/OpenStreetMap — kept intentionally minimal per client request; the real map is still future work. Implemented 2026-08-15.
+17. **Android platform added.** The Flutter app was Chrome/web-only through Override 14; Android SDK (platform 36, build-tools 28.0.3/35.0.0, command-line tools only — no Android Studio IDE) was installed to `C:\Android\sdk` and the project scaffolded with `flutter create --platforms=android .`. `INTERNET`/`ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` permissions added to `AndroidManifest.xml`. Web remains the primary dev loop (faster iteration); Android is for real device/GPS testing, particularly of Override 16's location tracking. No emulator is set up (no AVD system images installed) — testing needs a physical device with USB debugging or an emulator set up separately. Implemented 2026-08-15.
+18. **Trip deletion added (client request, additive).** `DELETE /trips/:id`: Owner can delete any trip in their company regardless of status; Driver can only delete their own trip while it's still `ASSIGNED` (`ForbiddenException`/`BadRequestException` otherwise). Deleting a trip cascades in a transaction — its `Expense` rows are deleted, while `FuelReceipt`/`Issue`/`LocationPing` rows are unlinked (`tripId` set null) rather than deleted, since those are historical records that can outlive the trip. Both trip detail screens (Owner and Driver) got a delete icon in the AppBar; confirming shows a warning dialog listing what's at stake — expense count/total if any are logged, and for Owner, a note if the trip is already past `ASSIGNED` (in transit/delivered/failed). Implemented 2026-08-15.
 
 ## Tech Stack (All Free/Open-Source)
 
-- **Mobile**: Flutter + Riverpod + go_router + drift + flutter_secure_storage + geolocator + workmanager (or flutter_background_service for foreground location) + flutter_map (OpenStreetMap) + fl_chart + share_plus + firebase_messaging
+- **Mobile**: Flutter (web + Android, Override 17) + Riverpod + go_router + drift + flutter_secure_storage + `geolocator` (in use, foreground-only — Override 16) + workmanager/flutter_background_service (still pending, needed for true background tracking) + flutter_map (OpenStreetMap, still pending) + fl_chart + share_plus + firebase_messaging
 - **Backend**: NestJS + TypeScript + Prisma + PostgreSQL + Redis/BullMQ + exceljs + Cloudinary/MinIO
 - **Deployment**: Render/Railway (API), Neon/Supabase (DB), Upstash (Redis), Cloudinary (files)
 - **Architecture**: Feature-based modules, Controller → Service → Repository → Prisma (backend); Clean Architecture data/domain/presentation per feature (Flutter). Multi-tenant via `company_id` on every table.
@@ -31,28 +37,35 @@
 - Owner creates Drivers via `POST /drivers` → temp password returned, `mustChangePassword: true` forced.
 - `PATCH /drivers/:id/deactivate` / `/reactivate` — soft-delete only, never hard-delete (historical trips/expenses reference drivers).
 
-### Trip Assignment (Owner)
-- **One Trip Form screen** (Override 12) handles both create and edit: origin, destination, driver dropdown, truck dropdown. `scheduled start`/`customer name`/`notes` from the original spec are still not built (no fields/columns for them yet) — not yet requested.
+### Trucks (Owner)
+- `Truck`: `id, companyId, plate (Truck Number), brand, vin?, createdAt`. Standard CRUD (`/trucks`), Owner-only.
+- `User.defaultTruckId` (driver's default truck): set via Add/Edit Driver form, validated to belong to the same company. Pre-fills the Truck dropdown when that driver is picked in the Trip Form (Override 13); still changeable per-trip from the same dropdown.
+
+### Trip Assignment (Owner + Driver self-assign)
+- **One Trip Form screen** (Override 12) handles both create and edit: origin, destination, driver dropdown, truck dropdown, delivery date (Override 13). `customer name`/`notes` from the original spec are still not built (no fields/columns for them yet) — not yet requested.
+- **Driver self-assign** (Override 15): a Driver can also create a trip, always assigned to themselves — `TripFormScreen(selfAssignDriverId: ...)` hides the driver dropdown, backend forces `driverId` to the caller regardless of request body. Editing (`PATCH`) is still Owner-only.
+- **Delivery date** (Override 13): `scheduledAt`, set at assignment time via Today/Tomorrow chips or a calendar picker.
 - **No double-booking guard** (Override 12) — a driver/truck already on another active trip can still be assigned; this was built then explicitly removed.
 - Creating a trip → `status: ASSIGNED`. FCM push to driver not yet built.
-- Owner's trip detail screen (tap a trip card): shows driver/truck assignment, an Edit action (opens the same Trip Form pre-filled), a read-only expense view, and a "live location — coming soon" placeholder.
+- Owner's trip detail screen (tap a trip card): shows driver/truck assignment, delivery date, an Edit action (opens the same Trip Form pre-filled), a read-only expense view (Owner can also add/edit/delete on the driver's behalf — Override 14), "Mark Delivered"/"Mark Failed" overrides (Override 14), and a "live location — coming soon" placeholder.
+- **Delete** (Override 18): `DELETE /trips/:id`, scoped by role — Owner can delete any trip in the company at any status; Driver can only delete their own trip while `ASSIGNED`. Confirmation dialog warns about logged expenses (deleted along with the trip) and, for Owner, about deleting a trip that's already past `ASSIGNED`.
 
 ### Driver Trip Lifecycle
 - Slide-to-confirm control (not tap) for Start Trip / End Trip — `slide_to_act` or equivalent custom widget.
-- Start → `status: IN_TRANSIT`. End → `status: DELIVERED` or `FAILED`.
+- Start → `status: IN_TRANSIT` (also stamps `Trip.startedAt`). End → `status: DELIVERED` or `FAILED` (also stamps `Trip.completedAt` — Override 13).
 - Starting/ending a trip does not control location tracking anymore (see Duty Status) — trip slider only changes trip status.
 - **Home screen ("My Trips") layout (Override 11)**: lists completed trips (`DELIVERED`/`FAILED`) plus the current assigned/in-progress trip as one card. The card is tap-to-open only — no slide control, no expense info shown inline on this list.
 - **Trip Detail screen**: reached by tapping the active trip card. Contains, in one place: the slide-to-start/end control, this trip's expense list (reusing the existing expense list view), and an "Add Expense" button that opens the existing expense form. This replaces the current split where the slider lived on the home list and expenses were a separate "Log Expenses" entry point.
 
 ### Duty Status (Online/Offline)
-- Driver-controlled toggle, independent of trip status — like a ride-hail "go online" switch.
+- Driver-controlled toggle, independent of trip status — like a ride-hail "go online" switch. Built (Override 16).
 - `DriverShift` table: `driver_id, company_id, started_at, ended_at (nullable), date`.
 - `POST /drivers/me/go-online`, `POST /drivers/me/go-offline`.
-- While Online: 60s location ping via foreground service, regardless of active trip. While Offline: tracking stops entirely.
+- While Online: 60s location ping, regardless of active trip. While Offline: tracking stops entirely. **Currently foreground-only** (Override 16) — "while Online" means "while the app is open," not a true background/OS-level service yet.
 - `location_pings`: `trip_id` nullable (ping can exist with no active trip), `driver_id` always present.
-- `POST /drivers/me/location` — generalized ping endpoint, backend attaches `trip_id` if one is active.
-- Owner map (`GET /drivers/online-locations`) shows all Online drivers — distinct marker style for "on a trip" vs "idle."
-- Starting a trip while Offline → prompt driver to go online, don't hard-block. Going offline mid-trip → confirm before stopping tracking./s
+- `POST /drivers/me/location` — generalized ping endpoint (Driver-only, requires an active shift), backend attaches `trip_id` if one is active.
+- Owner list (`GET /drivers/online-locations`) shows all Online drivers with latest ping — currently a plain text list (name, online dot, last-ping time), not a map. `flutter_map`/OpenStreetMap markers are still future work.
+- Starting a trip while Offline → prompt driver to go online, don't hard-block. Going offline mid-trip → confirm before stopping tracking. **Not yet built** — the toggle exists but doesn't yet cross-check against an active trip.
 
 ### Trip Expenses & Catch-Up
 - Categories: Fuel (amount, receipt photo, odometer optional), Fines (amount, reason, photo optional), Other (amount, category/note).
@@ -65,6 +78,7 @@
 - Credit tracking beyond a running total is deferred (see Open Decisions).
 .....
 ### Financial Reporting (Consolidated Excel)
+- Not the same thing as the standalone `GET /trips/export.xlsx` (Override 13, per-driver trip sheets) — that already exists and stays separate; this section is the future Sales/Expenses/Orders/Driver-Expenses workbook, still gated on step 17.
 - Periods: **Daily, Monthly, Six-Month** (quarterly deferred). One aggregator, reused for `?forma..t=json` (in-app) and `?format=xlsx` (download).
 - Single workbook per period, sheets: **Summary** (sales, expenses, net, credit outstanding), **Daily Sales** (from Orders), **Daily Expenses** (fuel/fines/maintenance/site/other), **Orders Detail**, **Driver Expenses** (grouped by driver).
 - Dashboard: compact "This Month" snapshot card (Revenue/Expenses/Net, color-coded).
@@ -85,14 +99,14 @@
 1. ✅ **Auth** — Owner-only register, `POST /drivers` temp password flow, deactivate/reactivate
 2. **Flutter Owner** — Add Driver form + share dialog + deactivate/reactivate on list
 3. **Flutter Driver** — Remove registration, add Set New Password screen
-4. **Trucks CRUD** + **Trips** (reference pattern: Controller → Service → Repository)
+4. ✅ **Trucks CRUD** + **Trips** (reference pattern: Controller → Service → Repository)
 5. ✅ Trip assignment form (double-booking guard built, then removed — Override 12)
-6. Driver slide-to-start/end (trip status only)
-7. Trip expense logging (fuel/fines/other), editable until `financiallyClosed`
-8. Duty Status: `DriverShift` table + go-online/go-offline endpoints
-9. Location ping: generalize endpoint, nullable `trip_id`, online-locations endpoint.
-10. Flutter (Driver): Online/Offline toggle wired to 60s background location service
-11. Flutter (Owner): Live Tracking. map (online/idle markers)
+6. ✅ Driver slide-to-start/end (trip status only)
+7. ✅ Trip expense logging (fuel/fines/other), editable until `financiallyClosed`
+8. ✅ Duty Status: `DriverShift` table + go-online/go-offline endpoints
+9. ✅ Location ping: generalize endpoint, nullable `trip_id`, online-locations endpoint.
+10. ✅ Flutter (Driver): Online/Offline toggle wired to 60s location service — **foreground-only**, not the background service originally specced (Override 16)
+11. Flutter (Owner): Live Tracking map (online/idle markers) — currently a plain list, not a map (Override 16); real `flutter_map` still pending
 12. Catch-Up expenses: pending-expenses endpoint + Flutter screen (reuses existing expense form)
 13. Orders/"Park" module CRUD (backend + Flutter)
 14. Fuel Receipts, site Expenses (placeholder), Maintenance, Documents, Issues, Notifications
@@ -117,4 +131,4 @@
 
 ---
 
-*Saved: 2026-07-06 — referenced on every module build
+*Saved: 2026-07-06, last updated 2026-08-15 (Override 18) — referenced on every module build

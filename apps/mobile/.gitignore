@@ -3,3 +3,9 @@
 .flutter-plugins-dependencies
 .pub-cache/
 build/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/

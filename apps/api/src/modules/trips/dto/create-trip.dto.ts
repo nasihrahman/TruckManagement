@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsOptional, IsString, IsISO8601 } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsDate } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateTripDto {
   @IsString()
@@ -10,8 +11,9 @@ export class CreateTripDto {
   destination!: string;
 
   @IsOptional()
-  @IsISO8601()
-  scheduledAt?: string;
+  @Transform(({ value }) => (value ? new Date(value) : value))
+  @IsDate()
+  scheduledAt?: Date;
 
   @IsOptional()
   @IsString()
