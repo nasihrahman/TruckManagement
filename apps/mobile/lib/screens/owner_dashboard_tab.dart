@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../widgets/app_brand_title.dart';
 import '../models/trip.dart';
 import '../models/driver.dart';
 import '../models/truck.dart';
@@ -81,7 +82,7 @@ class OwnerDashboardTabState extends State<OwnerDashboardTab> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard'),
+        title: const AppBrandTitle(title: 'Dashboard'),
         actions: [
           IconButton(onPressed: refresh, icon: const Icon(Icons.refresh)),
           IconButton(onPressed: widget.onLogout, icon: const Icon(Icons.logout)),

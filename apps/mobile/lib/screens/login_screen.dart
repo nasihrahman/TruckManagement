@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../widgets/app_brand_title.dart';
 import 'owner_home_screen.dart';
 import 'change_password_screen.dart';
 import 'driver_trips_screen.dart';
@@ -64,7 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Truck Management Login')),
+      appBar: AppBar(title: const AppBrandTitle(title: 'MS Trucks')),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(

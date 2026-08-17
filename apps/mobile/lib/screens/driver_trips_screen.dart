@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/trip.dart';
 import '../services/api_service.dart';
+import '../widgets/app_brand_title.dart';
 import 'trip_detail_screen.dart';
 import 'trip_form_screen.dart';
 
@@ -147,7 +148,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Trips'),
+        title: const AppBrandTitle(title: 'My Trips'),
         actions: [
           IconButton(
             onPressed: _refreshTrips,

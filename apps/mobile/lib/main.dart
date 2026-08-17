@@ -26,7 +26,7 @@ class TruckManagementApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'Truck Management',
+      title: 'MS Trucks',
       theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
       home: LoginScreen(apiService: apiService),
     );

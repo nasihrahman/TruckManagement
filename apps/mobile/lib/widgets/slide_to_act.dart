@@ -28,7 +28,7 @@ class _SlideToActState extends State<SlideToAct> {
       height: 60,
       width: 300,
       decoration: BoxDecoration(
-        color: widget.trackColor.withOpacity(0.2),
+        color: widget.trackColor.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(30),
       ),
       child: Stack(
@@ -36,7 +36,7 @@ class _SlideToActState extends State<SlideToAct> {
           Center(
             child: Text(
               widget.label,
-              style: TextStyle(color: widget.trackColor.withOpacity(0.6)),
+              style: TextStyle(color: widget.trackColor.withValues(alpha: 0.6)),
             ),
           ),
           Positioned(
@@ -63,7 +63,7 @@ class _SlideToActState extends State<SlideToAct> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),

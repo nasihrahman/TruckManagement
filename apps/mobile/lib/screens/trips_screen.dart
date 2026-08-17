@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/trip.dart';
 import '../services/api_service.dart';
+import '../widgets/app_brand_title.dart';
 import 'owner_trip_detail_screen.dart';
 
 class TripsScreen extends StatefulWidget {
@@ -60,7 +61,7 @@ class TripsScreenState extends State<TripsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Trips'),
+        title: const AppBrandTitle(title: 'Trips'),
         actions: [
           IconButton(onPressed: refreshTrips, icon: const Icon(Icons.refresh)),
           IconButton(onPressed: widget.onLogout, icon: const Icon(Icons.logout)),
