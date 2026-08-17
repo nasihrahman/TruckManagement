@@ -23,9 +23,9 @@ describe('TripsService', () => {
   });
 
   it('creates a trip for an Owner, keeping any driverId supplied', async () => {
-    repo.create.mockResolvedValue({ id: 't1', origin: 'A', destination: 'B' });
+    repo.create.mockResolvedValue({ id: 't1' });
     const owner = { userId: 'owner-1', role: 'OWNER', companyId: 'company-1' };
-    const res = await service.create(owner, { origin: 'A', destination: 'B', driverId: 'driver-9' } as any);
+    const res = await service.create(owner, { driverId: 'driver-9' } as any);
     expect(repo.create).toHaveBeenCalledWith(
       expect.objectContaining({ companyId: 'company-1', driverId: 'driver-9' }),
     );
@@ -33,9 +33,9 @@ describe('TripsService', () => {
   });
 
   it('forces driverId to self when a Driver self-assigns a trip', async () => {
-    repo.create.mockResolvedValue({ id: 't2', origin: 'A', destination: 'B' });
+    repo.create.mockResolvedValue({ id: 't2' });
     const driver = { userId: 'driver-1', role: 'DRIVER', companyId: 'company-1' };
-    await service.create(driver, { origin: 'A', destination: 'B', driverId: 'someone-else' } as any);
+    await service.create(driver, { driverId: 'someone-else' } as any);
     expect(repo.create).toHaveBeenCalledWith(
       expect.objectContaining({ companyId: 'company-1', driverId: 'driver-1' }),
     );

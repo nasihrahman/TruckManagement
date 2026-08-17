@@ -53,7 +53,7 @@ class TripsScreenState extends State<TripsScreen> {
     return trips.where((t) {
       if (_statusFilter != 'ALL' && t.status != _statusFilter) return false;
       if (query.isEmpty) return true;
-      return t.origin.toLowerCase().contains(query) || t.destination.toLowerCase().contains(query);
+      return t.displayTitle.toLowerCase().contains(query);
     }).toList();
   }
 
@@ -122,7 +122,7 @@ class TripsScreenState extends State<TripsScreen> {
                     final trip = trips[index];
                     return Card(
                       child: ListTile(
-                        title: Text('${trip.origin} → ${trip.destination}'),
+                        title: Text(trip.displayTitle),
                         subtitle: Text(
                           'Status: ${trip.status} · Expenses: ₹${trip.expenseTotal.toStringAsFixed(2)}',
                         ),

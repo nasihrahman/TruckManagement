@@ -26,6 +26,12 @@ export class TripsController {
     return this.tripsService.findByCompany(companyId, req.user.userId, req.user.role);
   }
 
+  @Get('customer-names')
+  @Roles(Role.OWNER, Role.DRIVER)
+  async customerNames(@Request() req: any) {
+    return this.tripsService.findDistinctCustomerNames(req.user.companyId);
+  }
+
   @Get('export.xlsx')
   @Roles(Role.OWNER)
   async exportXlsx(@Request() req: any, @Res() res: Response) {

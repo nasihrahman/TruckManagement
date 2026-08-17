@@ -1,15 +1,7 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, IsDate } from 'class-validator';
+import { IsNumber, IsOptional, IsPositive, IsString, IsDate } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class CreateTripDto {
-  @IsString()
-  @IsNotEmpty()
-  origin!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  destination!: string;
-
   @IsOptional()
   @Transform(({ value }) => (value ? new Date(value) : value))
   @IsDate()

@@ -511,7 +511,7 @@ class _SectionCard extends StatelessWidget {
               for (final trip in trips)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text('${trip.origin} → ${trip.destination}'),
+                  title: Text(trip.displayTitle),
                   subtitle: Text('Status: ${trip.status}'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => onTap(trip),

@@ -22,6 +22,10 @@ export class TripsService {
     return this.tripsRepository.findByCompany(companyId);
   }
 
+  async findDistinctCustomerNames(companyId: string): Promise<string[]> {
+    return this.tripsRepository.findDistinctCustomerNames(companyId);
+  }
+
   async findById(id: string): Promise<Trip> {
     const trip = await this.tripsRepository.findById(id);
     if (!trip) throw new NotFoundException('Trip not found');
@@ -32,8 +36,6 @@ export class TripsService {
     id: string,
     companyId: string,
     data: {
-      origin?: string;
-      destination?: string;
       scheduledAt?: Date;
       truckId?: string;
       driverId?: string;
@@ -109,8 +111,8 @@ export class TripsService {
 
     const workbook = new ExcelJS.Workbook();
     const columns = [
-      { header: 'Origin', key: 'origin', width: 20 },
-      { header: 'Destination', key: 'destination', width: 20 },
+      { header: 'Supplier', key: 'supplier', width: 20 },
+      { header: 'Customer', key: 'customerName', width: 20 },
       { header: 'Truck', key: 'truck', width: 20 },
       { header: 'Delivery Date', key: 'scheduledAt', width: 16 },
       { header: 'Status', key: 'status', width: 14 },
@@ -133,8 +135,8 @@ export class TripsService {
 
       for (const trip of driverTrips) {
         sheet.addRow({
-          origin: trip.origin,
-          destination: trip.destination,
+          supplier: trip.supplier?.name ?? '',
+          customerName: trip.customerName ?? '',
           truck: trip.truck ? [trip.truck.plate, trip.truck.brand].filter(Boolean).join(' · ') : 'Unassigned',
           scheduledAt: trip.scheduledAt ? trip.scheduledAt.toISOString().slice(0, 10) : '',
           status: trip.status,
@@ -171,8 +173,6 @@ export class TripsService {
       { header: 'Supplier', key: 'supplier', width: 18 },
       { header: 'Qty (CF)', key: 'qtyCf', width: 12 },
       { header: 'Customer', key: 'customerName', width: 20 },
-      { header: 'Origin', key: 'origin', width: 20 },
-      { header: 'Destination', key: 'destination', width: 20 },
       { header: 'Driver', key: 'driver', width: 20 },
       { header: 'Status', key: 'status', width: 14 },
       { header: 'Expenses', key: 'expenseTotal', width: 12 },
@@ -199,8 +199,6 @@ export class TripsService {
           supplier: trip.supplier?.name ?? '',
           qtyCf: trip.qtyCf ? Number(trip.qtyCf) : '',
           customerName: trip.customerName ?? '',
-          origin: trip.origin,
-          destination: trip.destination,
           driver: trip.driver
             ? [trip.driver.firstName, trip.driver.lastName].filter(Boolean).join(' ') || 'Driver'
             : 'Unassigned',

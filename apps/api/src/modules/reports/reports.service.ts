@@ -177,8 +177,8 @@ export class ReportsService {
     const tripsSheet = workbook.addWorksheet('Trips');
     tripsSheet.columns = [
       { header: 'Driver', key: 'driver', width: 22 },
-      { header: 'Origin', key: 'origin', width: 20 },
-      { header: 'Destination', key: 'destination', width: 20 },
+      { header: 'Supplier', key: 'supplier', width: 20 },
+      { header: 'Customer', key: 'customerName', width: 20 },
       { header: 'Truck', key: 'truck', width: 20 },
       { header: 'Status', key: 'status', width: 14 },
       { header: 'Delivery Date', key: 'scheduledAt', width: 16 },
@@ -190,8 +190,8 @@ export class ReportsService {
     for (const trip of trips) {
       tripsSheet.addRow({
         driver: driverName(trip.driver),
-        origin: trip.origin,
-        destination: trip.destination,
+        supplier: trip.supplier?.name ?? '',
+        customerName: trip.customerName ?? '',
         truck: trip.truck ? [trip.truck.plate, trip.truck.brand].filter(Boolean).join(' · ') : 'Unassigned',
         status: trip.status,
         scheduledAt: trip.scheduledAt ? trip.scheduledAt.toISOString().slice(0, 10) : '',
@@ -216,7 +216,9 @@ export class ReportsService {
       expensesSheet.addRow({
         date: expense.createdAt.toISOString().slice(0, 16).replace('T', ' '),
         driver: driverName(expense.driver),
-        trip: expense.trip ? `${expense.trip.origin} → ${expense.trip.destination}` : '',
+        trip: expense.trip
+          ? [expense.trip.supplier?.name, expense.trip.customerName].filter(Boolean).join(' → ')
+          : '',
         category: expense.category,
         amount: Number(expense.amount),
         reason: expense.reason ?? '',

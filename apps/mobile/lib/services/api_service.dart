@@ -130,8 +130,6 @@ class ApiService {
   }
 
   Future<Trip> createTrip({
-    required String origin,
-    required String destination,
     String? driverId,
     String? truckId,
     DateTime? scheduledAt,
@@ -145,8 +143,6 @@ class ApiService {
         Uri.parse('$baseUrl/trips'),
         headers: headers,
         body: jsonEncode({
-          'origin': origin,
-          'destination': destination,
           if (driverId != null) 'driverId': driverId,
           if (truckId != null) 'truckId': truckId,
           if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
@@ -166,8 +162,6 @@ class ApiService {
 
   Future<Trip> updateTrip(
     String tripId, {
-    String? origin,
-    String? destination,
     String? driverId,
     String? truckId,
     DateTime? scheduledAt,
@@ -181,8 +175,6 @@ class ApiService {
         Uri.parse('$baseUrl/trips/$tripId'),
         headers: headers,
         body: jsonEncode({
-          if (origin != null) 'origin': origin,
-          if (destination != null) 'destination': destination,
           if (driverId != null) 'driverId': driverId,
           if (truckId != null) 'truckId': truckId,
           if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
@@ -252,6 +244,20 @@ class ApiService {
       throw Exception(body['message'] ?? 'Unable to create material');
     }
     return CargoMaterial.fromJson(body);
+  }
+
+  Future<List<String>> fetchTripCustomerNames() async {
+    final response = await _send(
+      (headers) => http.get(Uri.parse('$baseUrl/trips/customer-names'), headers: headers),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(data['message'] ?? 'Unable to fetch customer names');
+    }
+    if (data is List) {
+      return data.map((item) => item.toString()).toList();
+    }
+    return [];
   }
 
   Future<List<Supplier>> fetchSuppliers() async {

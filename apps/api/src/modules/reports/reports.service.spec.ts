@@ -89,8 +89,8 @@ describe('ReportsService', () => {
     it('queries the detailed repository methods for the resolved range and returns a workbook buffer', async () => {
       mockRepository.findTripsCreatedInRangeDetailed.mockResolvedValue([
         {
-          origin: 'A',
-          destination: 'B',
+          supplier: { name: 'ACME Quarry' },
+          customerName: 'B',
           status: 'DELIVERED',
           scheduledAt: new Date('2026-08-11'),
           startedAt: new Date('2026-08-11'),
@@ -108,7 +108,7 @@ describe('ReportsService', () => {
           notes: 'Full tank',
           createdAt: new Date('2026-08-11'),
           driver: driverA,
-          trip: { origin: 'A', destination: 'B' },
+          trip: { supplier: { name: 'ACME Quarry' }, customerName: 'B' },
         },
       ]);
 

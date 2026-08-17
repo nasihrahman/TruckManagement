@@ -80,7 +80,7 @@ describe('Trips (e2e)', () => {
     const tripRes = await request(app.getHttpServer())
       .post('/api/v1/trips')
       .set('Authorization', `Bearer ${ownerToken}`)
-      .send({ origin: 'X', destination: 'Y' })
+      .send({ customerName: 'Y' })
       .expect(201);
 
     const tripId = tripRes.body.id;

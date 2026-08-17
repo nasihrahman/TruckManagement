@@ -18,7 +18,11 @@ export class TripsRepository {
     return this.prisma.trip.findMany({
       where: { companyId },
       orderBy: { createdAt: 'desc' },
-      include: { expenses: { select: { amount: true, category: true, createdAt: true } } },
+      include: {
+        expenses: { select: { amount: true, category: true, createdAt: true } },
+        material: { select: { name: true } },
+        supplier: { select: { name: true } },
+      },
     });
   }
 
@@ -47,12 +51,26 @@ export class TripsRepository {
         driverId,
       },
       orderBy: { createdAt: 'desc' },
-      include: { expenses: { select: { amount: true, category: true, createdAt: true } } },
+      include: {
+        expenses: { select: { amount: true, category: true, createdAt: true } },
+        material: { select: { name: true } },
+        supplier: { select: { name: true } },
+      },
     });
   }
 
   async findActiveTripForDriver(driverId: string): Promise<Trip | null> {
     return this.prisma.trip.findFirst({ where: { driverId, status: 'IN_TRANSIT' } });
+  }
+
+  async findDistinctCustomerNames(companyId: string): Promise<string[]> {
+    const rows = await this.prisma.trip.findMany({
+      where: { companyId, customerName: { not: null } },
+      select: { customerName: true },
+      distinct: ['customerName'],
+      orderBy: { customerName: 'asc' },
+    });
+    return rows.map((r) => r.customerName!).filter((name) => name.trim().length > 0);
   }
 
   async remove(id: string): Promise<void> {
@@ -72,6 +90,7 @@ export class TripsRepository {
       include: {
         driver: { select: { id: true, firstName: true, lastName: true } },
         truck: { select: { plate: true, brand: true } },
+        supplier: { select: { name: true } },
       },
     });
   }

@@ -105,8 +105,6 @@ model Trip {
   truckId       String?
   driver        User?         @relation(fields: [driverId], references: [id])
   driverId      String?
-  origin        String
-  destination   String
   status        TripStatus    @default(ASSIGNED)
   freightAmount Decimal?      @db.Decimal(10,2)
   scheduledAt   DateTime?

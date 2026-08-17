@@ -38,8 +38,8 @@ export class ReportsRepository {
     return this.prisma.trip.findMany({
       where: { companyId, createdAt: { gte: start, lt: end } },
       select: {
-        origin: true,
-        destination: true,
+        supplier: { select: { name: true } },
+        customerName: true,
         status: true,
         scheduledAt: true,
         startedAt: true,
@@ -62,7 +62,7 @@ export class ReportsRepository {
         notes: true,
         createdAt: true,
         driver: { select: DRIVER_SELECT },
-        trip: { select: { origin: true, destination: true } },
+        trip: { select: { supplier: { select: { name: true } }, customerName: true } },
       },
       orderBy: { createdAt: 'asc' },
     });

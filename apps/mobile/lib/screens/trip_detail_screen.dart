@@ -102,7 +102,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text('${_trip.origin} → ${_trip.destination}'),
+          title: Text(_trip.displayTitle),
           actions: [
             if (canDelete)
               IconButton(

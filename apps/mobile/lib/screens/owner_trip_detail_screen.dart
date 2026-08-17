@@ -173,7 +173,7 @@ class _OwnerTripDetailScreenState extends State<OwnerTripDetailScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text('${_trip.origin} → ${_trip.destination}'),
+          title: Text(_trip.displayTitle),
           actions: [
             IconButton(icon: const Icon(Icons.edit), onPressed: _editTrip, tooltip: 'Edit Trip'),
             IconButton(

@@ -140,7 +140,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
     return trips.where((t) {
       if (_statusFilter != 'ALL' && t.status != _statusFilter) return false;
       if (query.isEmpty) return true;
-      return t.origin.toLowerCase().contains(query) || t.destination.toLowerCase().contains(query);
+      return t.displayTitle.toLowerCase().contains(query);
     }).toList();
   }
 
@@ -247,7 +247,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
                           child: ListTile(
                             contentPadding: const EdgeInsets.all(16),
                             title: Text(
-                              '${trip.origin} → ${trip.destination}',
+                              trip.displayTitle,
                               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                             ),
                             subtitle: Padding(
@@ -267,7 +267,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
                         Card(
                           margin: const EdgeInsets.only(bottom: 12),
                           child: ListTile(
-                            title: Text('${trip.origin} → ${trip.destination}'),
+                            title: Text(trip.displayTitle),
                             subtitle: Padding(
                               padding: const EdgeInsets.only(top: 6),
                               child: _StatusBadge(status: trip.status),

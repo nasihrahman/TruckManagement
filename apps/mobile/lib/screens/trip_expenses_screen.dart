@@ -21,7 +21,7 @@ class _TripExpensesScreenState extends State<TripExpensesScreen> {
     final closed = widget.trip.financiallyClosed;
     return Scaffold(
       appBar: AppBar(
-        title: Text('Expenses: ${widget.trip.origin} → ${widget.trip.destination}'),
+        title: Text('Expenses: ${widget.trip.displayTitle}'),
       ),
       body: Column(
         children: [

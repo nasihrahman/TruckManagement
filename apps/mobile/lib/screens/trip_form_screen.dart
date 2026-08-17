@@ -22,14 +22,12 @@ class TripFormScreen extends StatefulWidget {
 
 class _TripFormScreenState extends State<TripFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _originController;
-  late final TextEditingController _destinationController;
   late final TextEditingController _qtyCfController;
-  late final TextEditingController _customerNameController;
   String? _selectedDriverId;
   String? _selectedTruckId;
   String? _selectedMaterialId;
   String? _selectedSupplierId;
+  String _customerName = '';
   DateTime? _deliveryDate;
   bool _isLoading = false;
   bool _isLoadingResources = true;
@@ -37,16 +35,15 @@ class _TripFormScreenState extends State<TripFormScreen> {
   List<Truck> _trucks = [];
   List<CargoMaterial> _materials = [];
   List<Supplier> _suppliers = [];
+  List<String> _customerSuggestions = [];
 
   bool get _isEditing => widget.existing != null;
 
   @override
   void initState() {
     super.initState();
-    _originController = TextEditingController(text: widget.existing?.origin ?? '');
-    _destinationController = TextEditingController(text: widget.existing?.destination ?? '');
     _qtyCfController = TextEditingController(text: widget.existing?.qtyCf?.toString() ?? '');
-    _customerNameController = TextEditingController(text: widget.existing?.customerName ?? '');
+    _customerName = widget.existing?.customerName ?? '';
     _selectedDriverId = widget.selfAssignDriverId ?? widget.existing?.driverId;
     _selectedTruckId = widget.existing?.truckId;
     _selectedMaterialId = widget.existing?.materialId;
@@ -57,10 +54,7 @@ class _TripFormScreenState extends State<TripFormScreen> {
 
   @override
   void dispose() {
-    _originController.dispose();
-    _destinationController.dispose();
     _qtyCfController.dispose();
-    _customerNameController.dispose();
     super.dispose();
   }
 
@@ -73,6 +67,7 @@ class _TripFormScreenState extends State<TripFormScreen> {
           widget.apiService.fetchMyDriverProfile(),
           widget.apiService.fetchCargoMaterials(),
           widget.apiService.fetchSuppliers(),
+          widget.apiService.fetchTripCustomerNames(),
         ]);
         final trucks = results[0] as List<Truck>;
         final profile = results[1] as Map<String, dynamic>;
@@ -81,6 +76,7 @@ class _TripFormScreenState extends State<TripFormScreen> {
           _selectedTruckId ??= profile['defaultTruckId']?.toString();
           _materials = results[2] as List<CargoMaterial>;
           _suppliers = results[3] as List<Supplier>;
+          _customerSuggestions = results[4] as List<String>;
         });
       } else {
         final results = await Future.wait([
@@ -88,12 +84,14 @@ class _TripFormScreenState extends State<TripFormScreen> {
           widget.apiService.fetchTrucks(),
           widget.apiService.fetchCargoMaterials(),
           widget.apiService.fetchSuppliers(),
+          widget.apiService.fetchTripCustomerNames(),
         ]);
         setState(() {
           _drivers = results[0] as List<Driver>;
           _trucks = results[1] as List<Truck>;
           _materials = results[2] as List<CargoMaterial>;
           _suppliers = results[3] as List<Supplier>;
+          _customerSuggestions = results[4] as List<String>;
         });
       }
     } catch (e) {
@@ -197,27 +195,23 @@ class _TripFormScreenState extends State<TripFormScreen> {
       if (_isEditing) {
         savedTrip = await widget.apiService.updateTrip(
           widget.existing!.id,
-          origin: _originController.text,
-          destination: _destinationController.text,
           driverId: _selectedDriverId,
           truckId: _selectedTruckId,
           scheduledAt: _deliveryDate,
           materialId: _selectedMaterialId,
           supplierId: _selectedSupplierId,
           qtyCf: qtyCf,
-          customerName: _customerNameController.text.trim(),
+          customerName: _customerName.trim(),
         );
       } else {
         savedTrip = await widget.apiService.createTrip(
-          origin: _originController.text,
-          destination: _destinationController.text,
           driverId: _selectedDriverId,
           truckId: _selectedTruckId,
           scheduledAt: _deliveryDate,
           materialId: _selectedMaterialId,
           supplierId: _selectedSupplierId,
           qtyCf: qtyCf,
-          customerName: _customerNameController.text.trim(),
+          customerName: _customerName.trim(),
         );
       }
       if (!mounted) return;
@@ -243,18 +237,6 @@ class _TripFormScreenState extends State<TripFormScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    TextFormField(
-                      controller: _originController,
-                      decoration: const InputDecoration(labelText: 'Origin'),
-                      validator: (value) => value == null || value.isEmpty ? 'Enter origin' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _destinationController,
-                      decoration: const InputDecoration(labelText: 'Destination'),
-                      validator: (value) => value == null || value.isEmpty ? 'Enter destination' : null,
-                    ),
-                    const SizedBox(height: 20),
                     Row(
                       children: [
                         const Expanded(
@@ -309,9 +291,22 @@ class _TripFormScreenState extends State<TripFormScreen> {
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     ),
                     const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _customerNameController,
-                      decoration: const InputDecoration(labelText: 'Customer Name (Optional)'),
+                    Autocomplete<String>(
+                      initialValue: TextEditingValue(text: _customerName),
+                      optionsBuilder: (textEditingValue) {
+                        if (textEditingValue.text.isEmpty) return _customerSuggestions;
+                        final query = textEditingValue.text.toLowerCase();
+                        return _customerSuggestions.where((c) => c.toLowerCase().contains(query));
+                      },
+                      onSelected: (selection) => setState(() => _customerName = selection),
+                      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                        return TextFormField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          decoration: const InputDecoration(labelText: 'Customer Name (Optional)'),
+                          onChanged: (value) => _customerName = value,
+                        );
+                      },
                     ),
                     if (widget.selfAssignDriverId == null) ...[
                       const SizedBox(height: 20),
