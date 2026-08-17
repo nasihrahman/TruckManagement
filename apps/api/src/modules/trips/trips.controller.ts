@@ -37,6 +37,17 @@ export class TripsController {
     res.send(buffer);
   }
 
+  @Get('export-by-truck.xlsx')
+  @Roles(Role.OWNER)
+  async exportByTruckXlsx(@Request() req: any, @Res() res: Response) {
+    const buffer = await this.tripsService.exportByTruckToExcel(req.user.companyId);
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename="trips-by-truck-export.xlsx"',
+    });
+    res.send(buffer);
+  }
+
   @Get(':id')
   async get(@Request() req: any, @Param('id') id: string) {
     const trip = await this.tripsService.findById(id);

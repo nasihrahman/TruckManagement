@@ -22,6 +22,7 @@ model Company {
   notifications Notification[]
   driverShifts DriverShift[]
   locationPings LocationPing[]
+  materials    Material[]
 }
 
 model User {
@@ -73,6 +74,17 @@ model Truck {
   defaultForDrivers User[]
 }
 
+model Material {
+  id        String   @id @default(cuid())
+  company   Company  @relation(fields: [companyId], references: [id])
+  companyId String
+  name      String
+  createdAt DateTime @default(now())
+  trips     Trip[]
+
+  @@unique([companyId, name])
+}
+
 model Trip {
   id            String        @id @default(cuid())
   company       Company       @relation(fields: [companyId], references: [id])
@@ -90,6 +102,11 @@ model Trip {
   completedAt   DateTime?
   financiallyClosed Boolean   @default(false)
   createdAt     DateTime      @default(now())
+  material      Material?     @relation(fields: [materialId], references: [id])
+  materialId    String?
+  supplier      String?
+  qtyCf         Decimal?      @db.Decimal(10,2)
+  customerName  String?
   fuelReceipts  FuelReceipt[]
   expenses      Expense[]
   issues        Issue[]

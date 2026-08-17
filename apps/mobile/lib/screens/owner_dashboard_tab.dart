@@ -25,6 +25,7 @@ class OwnerDashboardTab extends StatefulWidget {
 class OwnerDashboardTabState extends State<OwnerDashboardTab> {
   Future<_DashboardData>? _dataFuture;
   bool _isExporting = false;
+  bool _isExportingByTruck = false;
 
   @override
   void initState() {
@@ -75,6 +76,21 @@ class OwnerDashboardTabState extends State<OwnerDashboardTab> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  Future<void> _exportByTruck() async {
+    setState(() => _isExportingByTruck = true);
+    try {
+      final bytes = await widget.apiService.exportTripsByTruckExcel();
+      downloadBytes(bytes, 'trips-by-truck-export.xlsx');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export downloaded')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _isExportingByTruck = false);
     }
   }
 
@@ -247,7 +263,18 @@ class OwnerDashboardTabState extends State<OwnerDashboardTab> {
                     icon: _isExporting
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.download),
-                    label: const Text('Export Trips to Excel'),
+                    label: const Text('Export by Driver to Excel'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _isExportingByTruck ? null : _exportByTruck,
+                    icon: _isExportingByTruck
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.local_shipping_outlined),
+                    label: const Text('Export by Truck to Excel'),
                   ),
                 ),
               ],

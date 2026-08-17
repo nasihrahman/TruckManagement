@@ -26,6 +26,10 @@ class Trip {
   final DateTime? startedAt;
   final DateTime? completedAt;
   final List<TripExpenseEntry> expenses;
+  final String? materialId;
+  final String? supplier;
+  final double? qtyCf;
+  final String? customerName;
 
   Trip({
     required this.id,
@@ -39,6 +43,10 @@ class Trip {
     this.startedAt,
     this.completedAt,
     this.expenses = const [],
+    this.materialId,
+    this.supplier,
+    this.qtyCf,
+    this.customerName,
   });
 
   double get expenseTotal => expenses.fold(0, (sum, e) => sum + e.amount);
@@ -60,6 +68,10 @@ class Trip {
               .map((e) => TripExpenseEntry.fromJson(e as Map<String, dynamic>))
               .toList()
           : const [],
+      materialId: json['materialId']?.toString(),
+      supplier: json['supplier']?.toString(),
+      qtyCf: json['qtyCf'] != null ? double.tryParse(json['qtyCf'].toString()) : null,
+      customerName: json['customerName']?.toString(),
     );
   }
 }

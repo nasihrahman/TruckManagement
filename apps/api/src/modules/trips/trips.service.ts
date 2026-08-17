@@ -31,7 +31,17 @@ export class TripsService {
   async update(
     id: string,
     companyId: string,
-    data: { origin?: string; destination?: string; scheduledAt?: Date; truckId?: string; driverId?: string },
+    data: {
+      origin?: string;
+      destination?: string;
+      scheduledAt?: Date;
+      truckId?: string;
+      driverId?: string;
+      materialId?: string;
+      supplier?: string;
+      qtyCf?: number;
+      customerName?: string;
+    },
   ) {
     const trip = await this.findById(id);
     if (trip.companyId !== companyId) throw new ForbiddenException();
@@ -130,6 +140,72 @@ export class TripsService {
           status: trip.status,
           startedAt: trip.startedAt ? trip.startedAt.toISOString().slice(0, 16).replace('T', ' ') : '',
           completedAt: trip.completedAt ? trip.completedAt.toISOString().slice(0, 16).replace('T', ' ') : '',
+        });
+      }
+    }
+
+    if (workbook.worksheets.length === 0) {
+      const sheet = workbook.addWorksheet('Trips');
+      sheet.columns = columns;
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
+  }
+
+  async exportByTruckToExcel(companyId: string): Promise<Buffer> {
+    const trips = await this.tripsRepository.findByCompanyForTruckExport(companyId);
+
+    const groups = new Map<string, { name: string; trips: typeof trips }>();
+    for (const trip of trips) {
+      const key = trip.truck?.id ?? 'unassigned';
+      const name = trip.truck ? trip.truck.plate : 'Unassigned';
+      if (!groups.has(key)) groups.set(key, { name, trips: [] });
+      groups.get(key)!.trips.push(trip);
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const columns = [
+      { header: 'Date', key: 'scheduledAt', width: 14 },
+      { header: 'Material', key: 'material', width: 16 },
+      { header: 'Supplier', key: 'supplier', width: 18 },
+      { header: 'Qty (CF)', key: 'qtyCf', width: 12 },
+      { header: 'Customer', key: 'customerName', width: 20 },
+      { header: 'Origin', key: 'origin', width: 20 },
+      { header: 'Destination', key: 'destination', width: 20 },
+      { header: 'Driver', key: 'driver', width: 20 },
+      { header: 'Status', key: 'status', width: 14 },
+      { header: 'Expenses', key: 'expenseTotal', width: 12 },
+    ];
+
+    const usedNames = new Set<string>();
+    for (const { name, trips: truckTrips } of groups.values()) {
+      let sheetName = name.replace(/[*?:/\\[\]]/g, ' ').trim().slice(0, 31) || 'Truck';
+      let suffix = 2;
+      while (usedNames.has(sheetName)) {
+        sheetName = `${sheetName.slice(0, 28)} (${suffix++})`;
+      }
+      usedNames.add(sheetName);
+
+      const sheet = workbook.addWorksheet(sheetName);
+      sheet.columns = columns;
+      sheet.getRow(1).font = { bold: true };
+
+      for (const trip of truckTrips) {
+        const expenseTotal = trip.expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+        sheet.addRow({
+          scheduledAt: trip.scheduledAt ? trip.scheduledAt.toISOString().slice(0, 10) : '',
+          material: trip.material?.name ?? '',
+          supplier: trip.supplier ?? '',
+          qtyCf: trip.qtyCf ? Number(trip.qtyCf) : '',
+          customerName: trip.customerName ?? '',
+          origin: trip.origin,
+          destination: trip.destination,
+          driver: trip.driver
+            ? [trip.driver.firstName, trip.driver.lastName].filter(Boolean).join(' ') || 'Driver'
+            : 'Unassigned',
+          status: trip.status,
+          expenseTotal,
         });
       }
     }

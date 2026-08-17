@@ -75,4 +75,17 @@ export class TripsRepository {
       },
     });
   }
+
+  async findByCompanyForTruckExport(companyId: string) {
+    return this.prisma.trip.findMany({
+      where: { companyId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        driver: { select: { id: true, firstName: true, lastName: true } },
+        truck: { select: { id: true, plate: true, brand: true } },
+        material: { select: { name: true } },
+        expenses: { select: { amount: true } },
+      },
+    });
+  }
 }

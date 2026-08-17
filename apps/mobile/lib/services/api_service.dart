@@ -7,6 +7,7 @@ import '../models/driver.dart';
 import '../models/expense.dart';
 import '../models/truck.dart';
 import '../models/owner.dart';
+import '../models/material.dart';
 
 class ApiService {
   ApiService({required this.baseUrl});
@@ -133,6 +134,10 @@ class ApiService {
     String? driverId,
     String? truckId,
     DateTime? scheduledAt,
+    String? materialId,
+    String? supplier,
+    double? qtyCf,
+    String? customerName,
   }) async {
     final response = await _send(
       (headers) => http.post(
@@ -144,6 +149,10 @@ class ApiService {
           if (driverId != null) 'driverId': driverId,
           if (truckId != null) 'truckId': truckId,
           if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
+          if (materialId != null) 'materialId': materialId,
+          if (supplier != null && supplier.isNotEmpty) 'supplier': supplier,
+          if (qtyCf != null) 'qtyCf': qtyCf,
+          if (customerName != null && customerName.isNotEmpty) 'customerName': customerName,
         }),
       ),
     );
@@ -161,6 +170,10 @@ class ApiService {
     String? driverId,
     String? truckId,
     DateTime? scheduledAt,
+    String? materialId,
+    String? supplier,
+    double? qtyCf,
+    String? customerName,
   }) async {
     final response = await _send(
       (headers) => http.patch(
@@ -172,6 +185,10 @@ class ApiService {
           if (driverId != null) 'driverId': driverId,
           if (truckId != null) 'truckId': truckId,
           if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
+          if (materialId != null) 'materialId': materialId,
+          if (supplier != null) 'supplier': supplier,
+          if (qtyCf != null) 'qtyCf': qtyCf,
+          if (customerName != null) 'customerName': customerName,
         }),
       ),
     );
@@ -205,6 +222,45 @@ class ApiService {
       final body = jsonDecode(response.body);
       throw Exception(body['message'] ?? 'Failed to delete trip');
     }
+  }
+
+  Future<List<CargoMaterial>> fetchCargoMaterials() async {
+    final response = await _send(
+      (headers) => http.get(Uri.parse('$baseUrl/materials'), headers: headers),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(data['message'] ?? 'Unable to fetch materials');
+    }
+    if (data is List) {
+      return data.map((item) => CargoMaterial.fromJson(item as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  Future<CargoMaterial> createCargoMaterial(String name) async {
+    final response = await _send(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/materials'),
+        headers: headers,
+        body: jsonEncode({'name': name}),
+      ),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Unable to create material');
+    }
+    return CargoMaterial.fromJson(body);
+  }
+
+  Future<Uint8List> exportTripsByTruckExcel() async {
+    final response = await _send(
+      (headers) => http.get(Uri.parse('$baseUrl/trips/export-by-truck.xlsx'), headers: headers),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception('Unable to export trips by truck');
+    }
+    return response.bodyBytes;
   }
 
   Future<List<Driver>> fetchDrivers() async {

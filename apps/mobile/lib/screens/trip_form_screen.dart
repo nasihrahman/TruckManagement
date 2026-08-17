@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/driver.dart';
 import '../models/trip.dart';
 import '../models/truck.dart';
+import '../models/material.dart';
 import '../services/api_service.dart';
 
 class TripFormScreen extends StatefulWidget {
@@ -22,13 +23,18 @@ class _TripFormScreenState extends State<TripFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _originController;
   late final TextEditingController _destinationController;
+  late final TextEditingController _supplierController;
+  late final TextEditingController _qtyCfController;
+  late final TextEditingController _customerNameController;
   String? _selectedDriverId;
   String? _selectedTruckId;
+  String? _selectedMaterialId;
   DateTime? _deliveryDate;
   bool _isLoading = false;
   bool _isLoadingResources = true;
   List<Driver> _drivers = [];
   List<Truck> _trucks = [];
+  List<CargoMaterial> _materials = [];
 
   bool get _isEditing => widget.existing != null;
 
@@ -37,8 +43,12 @@ class _TripFormScreenState extends State<TripFormScreen> {
     super.initState();
     _originController = TextEditingController(text: widget.existing?.origin ?? '');
     _destinationController = TextEditingController(text: widget.existing?.destination ?? '');
+    _supplierController = TextEditingController(text: widget.existing?.supplier ?? '');
+    _qtyCfController = TextEditingController(text: widget.existing?.qtyCf?.toString() ?? '');
+    _customerNameController = TextEditingController(text: widget.existing?.customerName ?? '');
     _selectedDriverId = widget.selfAssignDriverId ?? widget.existing?.driverId;
     _selectedTruckId = widget.existing?.truckId;
+    _selectedMaterialId = widget.existing?.materialId;
     _deliveryDate = widget.existing?.scheduledAt;
     _loadResources();
   }
@@ -47,6 +57,9 @@ class _TripFormScreenState extends State<TripFormScreen> {
   void dispose() {
     _originController.dispose();
     _destinationController.dispose();
+    _supplierController.dispose();
+    _qtyCfController.dispose();
+    _customerNameController.dispose();
     super.dispose();
   }
 
@@ -57,21 +70,25 @@ class _TripFormScreenState extends State<TripFormScreen> {
         final results = await Future.wait([
           widget.apiService.fetchTrucks(),
           widget.apiService.fetchMyDriverProfile(),
+          widget.apiService.fetchCargoMaterials(),
         ]);
         final trucks = results[0] as List<Truck>;
         final profile = results[1] as Map<String, dynamic>;
         setState(() {
           _trucks = trucks;
           _selectedTruckId ??= profile['defaultTruckId']?.toString();
+          _materials = results[2] as List<CargoMaterial>;
         });
       } else {
         final results = await Future.wait([
           widget.apiService.fetchDrivers(),
           widget.apiService.fetchTrucks(),
+          widget.apiService.fetchCargoMaterials(),
         ]);
         setState(() {
           _drivers = results[0] as List<Driver>;
           _trucks = results[1] as List<Truck>;
+          _materials = results[2] as List<CargoMaterial>;
         });
       }
     } catch (e) {
@@ -79,6 +96,41 @@ class _TripFormScreenState extends State<TripFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _isLoadingResources = false);
+    }
+  }
+
+  Future<void> _addMaterial() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Material'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Material name'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+
+    try {
+      final material = await widget.apiService.createCargoMaterial(name);
+      if (!mounted) return;
+      setState(() {
+        _materials = [..._materials, material];
+        _selectedMaterialId = material.id;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -100,6 +152,7 @@ class _TripFormScreenState extends State<TripFormScreen> {
 
     setState(() => _isLoading = true);
     try {
+      final qtyCf = double.tryParse(_qtyCfController.text.trim());
       final Trip savedTrip;
       if (_isEditing) {
         savedTrip = await widget.apiService.updateTrip(
@@ -109,6 +162,10 @@ class _TripFormScreenState extends State<TripFormScreen> {
           driverId: _selectedDriverId,
           truckId: _selectedTruckId,
           scheduledAt: _deliveryDate,
+          materialId: _selectedMaterialId,
+          supplier: _supplierController.text.trim(),
+          qtyCf: qtyCf,
+          customerName: _customerNameController.text.trim(),
         );
       } else {
         savedTrip = await widget.apiService.createTrip(
@@ -117,6 +174,10 @@ class _TripFormScreenState extends State<TripFormScreen> {
           driverId: _selectedDriverId,
           truckId: _selectedTruckId,
           scheduledAt: _deliveryDate,
+          materialId: _selectedMaterialId,
+          supplier: _supplierController.text.trim(),
+          qtyCf: qtyCf,
+          customerName: _customerNameController.text.trim(),
         );
       }
       if (!mounted) return;
@@ -152,6 +213,46 @@ class _TripFormScreenState extends State<TripFormScreen> {
                       controller: _destinationController,
                       decoration: const InputDecoration(labelText: 'Destination'),
                       validator: (value) => value == null || value.isEmpty ? 'Enter destination' : null,
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text('Material', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        if (widget.selfAssignDriverId == null)
+                          TextButton.icon(
+                            onPressed: _addMaterial,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Add'),
+                          ),
+                      ],
+                    ),
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedMaterialId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(border: OutlineInputBorder()),
+                      hint: const Text('None'),
+                      items: _materials
+                          .map((m) => DropdownMenuItem<String>(value: m.id, child: Text(m.name)))
+                          .toList(),
+                      onChanged: (val) => setState(() => _selectedMaterialId = val),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _supplierController,
+                      decoration: const InputDecoration(labelText: 'Supplier (Optional)'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _qtyCfController,
+                      decoration: const InputDecoration(labelText: 'Qty (CF) (Optional)'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _customerNameController,
+                      decoration: const InputDecoration(labelText: 'Customer Name (Optional)'),
                     ),
                     if (widget.selfAssignDriverId == null) ...[
                       const SizedBox(height: 20),
