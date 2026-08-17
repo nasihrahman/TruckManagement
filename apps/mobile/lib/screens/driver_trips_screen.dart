@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/trip.dart';
 import '../services/api_service.dart';
+import '../services/tracking_notification_service.dart';
 import '../widgets/app_brand_title.dart';
 import 'trip_detail_screen.dart';
 import 'trip_form_screen.dart';
@@ -35,6 +36,9 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
   void dispose() {
     _locationTimer?.cancel();
     _searchController.dispose();
+    // Intentionally not cancelling the tracking notification here: this
+    // screen is disposed on logout too, and Duty Status (server-side) stays
+    // Online across app restarts, so the reminder should persist with it.
     super.dispose();
   }
 
@@ -46,7 +50,10 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
         _myDriverId = profile['id']?.toString();
         _isOnline = profile['isOnline'] == true;
       });
-      if (_isOnline) _startLocationTimer();
+      if (_isOnline) {
+        _startLocationTimer();
+        TrackingNotificationService.instance.showTrackingActive();
+      }
     } catch (_) {
       // Non-fatal: Create Trip / duty toggle just stay unavailable until this loads.
     }
@@ -121,9 +128,12 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
         }
         await widget.apiService.goOnline();
         _startLocationTimer();
+        await TrackingNotificationService.instance.requestPermission();
+        await TrackingNotificationService.instance.showTrackingActive();
       } else {
         _locationTimer?.cancel();
         await widget.apiService.goOffline();
+        await TrackingNotificationService.instance.cancelTrackingActive();
       }
       if (!mounted) return;
       setState(() => _isOnline = value);
