@@ -3,6 +3,7 @@ import '../models/driver.dart';
 import '../models/trip.dart';
 import '../models/truck.dart';
 import '../models/material.dart';
+import '../models/supplier.dart';
 import '../services/api_service.dart';
 
 class TripFormScreen extends StatefulWidget {
@@ -23,18 +24,19 @@ class _TripFormScreenState extends State<TripFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _originController;
   late final TextEditingController _destinationController;
-  late final TextEditingController _supplierController;
   late final TextEditingController _qtyCfController;
   late final TextEditingController _customerNameController;
   String? _selectedDriverId;
   String? _selectedTruckId;
   String? _selectedMaterialId;
+  String? _selectedSupplierId;
   DateTime? _deliveryDate;
   bool _isLoading = false;
   bool _isLoadingResources = true;
   List<Driver> _drivers = [];
   List<Truck> _trucks = [];
   List<CargoMaterial> _materials = [];
+  List<Supplier> _suppliers = [];
 
   bool get _isEditing => widget.existing != null;
 
@@ -43,12 +45,12 @@ class _TripFormScreenState extends State<TripFormScreen> {
     super.initState();
     _originController = TextEditingController(text: widget.existing?.origin ?? '');
     _destinationController = TextEditingController(text: widget.existing?.destination ?? '');
-    _supplierController = TextEditingController(text: widget.existing?.supplier ?? '');
     _qtyCfController = TextEditingController(text: widget.existing?.qtyCf?.toString() ?? '');
     _customerNameController = TextEditingController(text: widget.existing?.customerName ?? '');
     _selectedDriverId = widget.selfAssignDriverId ?? widget.existing?.driverId;
     _selectedTruckId = widget.existing?.truckId;
     _selectedMaterialId = widget.existing?.materialId;
+    _selectedSupplierId = widget.existing?.supplierId;
     _deliveryDate = widget.existing?.scheduledAt;
     _loadResources();
   }
@@ -57,7 +59,6 @@ class _TripFormScreenState extends State<TripFormScreen> {
   void dispose() {
     _originController.dispose();
     _destinationController.dispose();
-    _supplierController.dispose();
     _qtyCfController.dispose();
     _customerNameController.dispose();
     super.dispose();
@@ -71,6 +72,7 @@ class _TripFormScreenState extends State<TripFormScreen> {
           widget.apiService.fetchTrucks(),
           widget.apiService.fetchMyDriverProfile(),
           widget.apiService.fetchCargoMaterials(),
+          widget.apiService.fetchSuppliers(),
         ]);
         final trucks = results[0] as List<Truck>;
         final profile = results[1] as Map<String, dynamic>;
@@ -78,17 +80,20 @@ class _TripFormScreenState extends State<TripFormScreen> {
           _trucks = trucks;
           _selectedTruckId ??= profile['defaultTruckId']?.toString();
           _materials = results[2] as List<CargoMaterial>;
+          _suppliers = results[3] as List<Supplier>;
         });
       } else {
         final results = await Future.wait([
           widget.apiService.fetchDrivers(),
           widget.apiService.fetchTrucks(),
           widget.apiService.fetchCargoMaterials(),
+          widget.apiService.fetchSuppliers(),
         ]);
         setState(() {
           _drivers = results[0] as List<Driver>;
           _trucks = results[1] as List<Truck>;
           _materials = results[2] as List<CargoMaterial>;
+          _suppliers = results[3] as List<Supplier>;
         });
       }
     } catch (e) {
@@ -134,6 +139,41 @@ class _TripFormScreenState extends State<TripFormScreen> {
     }
   }
 
+  Future<void> _addSupplier() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Supplier'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Supplier name'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+
+    try {
+      final supplier = await widget.apiService.createSupplier(name);
+      if (!mounted) return;
+      setState(() {
+        _suppliers = [..._suppliers, supplier];
+        _selectedSupplierId = supplier.id;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
   bool _isSameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
 
   Future<void> _pickDeliveryDateFromCalendar() async {
@@ -163,7 +203,7 @@ class _TripFormScreenState extends State<TripFormScreen> {
           truckId: _selectedTruckId,
           scheduledAt: _deliveryDate,
           materialId: _selectedMaterialId,
-          supplier: _supplierController.text.trim(),
+          supplierId: _selectedSupplierId,
           qtyCf: qtyCf,
           customerName: _customerNameController.text.trim(),
         );
@@ -175,7 +215,7 @@ class _TripFormScreenState extends State<TripFormScreen> {
           truckId: _selectedTruckId,
           scheduledAt: _deliveryDate,
           materialId: _selectedMaterialId,
-          supplier: _supplierController.text.trim(),
+          supplierId: _selectedSupplierId,
           qtyCf: qtyCf,
           customerName: _customerNameController.text.trim(),
         );
@@ -238,10 +278,29 @@ class _TripFormScreenState extends State<TripFormScreen> {
                           .toList(),
                       onChanged: (val) => setState(() => _selectedMaterialId = val),
                     ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _supplierController,
-                      decoration: const InputDecoration(labelText: 'Supplier (Optional)'),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text('Supplier', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        if (widget.selfAssignDriverId == null)
+                          TextButton.icon(
+                            onPressed: _addSupplier,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Add'),
+                          ),
+                      ],
+                    ),
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedSupplierId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(border: OutlineInputBorder()),
+                      hint: const Text('None'),
+                      items: _suppliers
+                          .map((s) => DropdownMenuItem<String>(value: s.id, child: Text(s.name)))
+                          .toList(),
+                      onChanged: (val) => setState(() => _selectedSupplierId = val),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(

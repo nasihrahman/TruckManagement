@@ -29,7 +29,7 @@ export class CreateTripDto {
 
   @IsOptional()
   @IsString()
-  supplier?: string;
+  supplierId?: string;
 
   @IsOptional()
   @IsNumber()

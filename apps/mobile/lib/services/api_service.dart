@@ -8,6 +8,7 @@ import '../models/expense.dart';
 import '../models/truck.dart';
 import '../models/owner.dart';
 import '../models/material.dart';
+import '../models/supplier.dart';
 
 class ApiService {
   ApiService({required this.baseUrl});
@@ -135,7 +136,7 @@ class ApiService {
     String? truckId,
     DateTime? scheduledAt,
     String? materialId,
-    String? supplier,
+    String? supplierId,
     double? qtyCf,
     String? customerName,
   }) async {
@@ -150,7 +151,7 @@ class ApiService {
           if (truckId != null) 'truckId': truckId,
           if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
           if (materialId != null) 'materialId': materialId,
-          if (supplier != null && supplier.isNotEmpty) 'supplier': supplier,
+          if (supplierId != null) 'supplierId': supplierId,
           if (qtyCf != null) 'qtyCf': qtyCf,
           if (customerName != null && customerName.isNotEmpty) 'customerName': customerName,
         }),
@@ -171,7 +172,7 @@ class ApiService {
     String? truckId,
     DateTime? scheduledAt,
     String? materialId,
-    String? supplier,
+    String? supplierId,
     double? qtyCf,
     String? customerName,
   }) async {
@@ -186,7 +187,7 @@ class ApiService {
           if (truckId != null) 'truckId': truckId,
           if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
           if (materialId != null) 'materialId': materialId,
-          if (supplier != null) 'supplier': supplier,
+          if (supplierId != null) 'supplierId': supplierId,
           if (qtyCf != null) 'qtyCf': qtyCf,
           if (customerName != null) 'customerName': customerName,
         }),
@@ -251,6 +252,35 @@ class ApiService {
       throw Exception(body['message'] ?? 'Unable to create material');
     }
     return CargoMaterial.fromJson(body);
+  }
+
+  Future<List<Supplier>> fetchSuppliers() async {
+    final response = await _send(
+      (headers) => http.get(Uri.parse('$baseUrl/suppliers'), headers: headers),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(data['message'] ?? 'Unable to fetch suppliers');
+    }
+    if (data is List) {
+      return data.map((item) => Supplier.fromJson(item as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  Future<Supplier> createSupplier(String name) async {
+    final response = await _send(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/suppliers'),
+        headers: headers,
+        body: jsonEncode({'name': name}),
+      ),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Unable to create supplier');
+    }
+    return Supplier.fromJson(body);
   }
 
   Future<Uint8List> exportTripsByTruckExcel() async {

@@ -31,7 +31,7 @@ export class UpdateTripDto {
 
   @IsOptional()
   @IsString()
-  supplier?: string;
+  supplierId?: string;
 
   @IsOptional()
   @IsNumber()

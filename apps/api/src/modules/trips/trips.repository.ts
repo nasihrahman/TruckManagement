@@ -84,6 +84,7 @@ export class TripsRepository {
         driver: { select: { id: true, firstName: true, lastName: true } },
         truck: { select: { id: true, plate: true, brand: true } },
         material: { select: { name: true } },
+        supplier: { select: { name: true } },
         expenses: { select: { amount: true } },
       },
     });

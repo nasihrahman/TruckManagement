@@ -38,7 +38,7 @@ export class TripsService {
       truckId?: string;
       driverId?: string;
       materialId?: string;
-      supplier?: string;
+      supplierId?: string;
       qtyCf?: number;
       customerName?: string;
     },
@@ -196,7 +196,7 @@ export class TripsService {
         sheet.addRow({
           scheduledAt: trip.scheduledAt ? trip.scheduledAt.toISOString().slice(0, 10) : '',
           material: trip.material?.name ?? '',
-          supplier: trip.supplier ?? '',
+          supplier: trip.supplier?.name ?? '',
           qtyCf: trip.qtyCf ? Number(trip.qtyCf) : '',
           customerName: trip.customerName ?? '',
           origin: trip.origin,

@@ -23,6 +23,7 @@ model Company {
   driverShifts DriverShift[]
   locationPings LocationPing[]
   materials    Material[]
+  suppliers    Supplier[]
 }
 
 model User {
@@ -85,6 +86,17 @@ model Material {
   @@unique([companyId, name])
 }
 
+model Supplier {
+  id        String   @id @default(cuid())
+  company   Company  @relation(fields: [companyId], references: [id])
+  companyId String
+  name      String
+  createdAt DateTime @default(now())
+  trips     Trip[]
+
+  @@unique([companyId, name])
+}
+
 model Trip {
   id            String        @id @default(cuid())
   company       Company       @relation(fields: [companyId], references: [id])
@@ -104,7 +116,8 @@ model Trip {
   createdAt     DateTime      @default(now())
   material      Material?     @relation(fields: [materialId], references: [id])
   materialId    String?
-  supplier      String?
+  supplier      Supplier?     @relation(fields: [supplierId], references: [id])
+  supplierId    String?
   qtyCf         Decimal?      @db.Decimal(10,2)
   customerName  String?
   fuelReceipts  FuelReceipt[]

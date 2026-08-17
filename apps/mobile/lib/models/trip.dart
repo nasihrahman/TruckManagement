@@ -27,7 +27,7 @@ class Trip {
   final DateTime? completedAt;
   final List<TripExpenseEntry> expenses;
   final String? materialId;
-  final String? supplier;
+  final String? supplierId;
   final double? qtyCf;
   final String? customerName;
 
@@ -44,7 +44,7 @@ class Trip {
     this.completedAt,
     this.expenses = const [],
     this.materialId,
-    this.supplier,
+    this.supplierId,
     this.qtyCf,
     this.customerName,
   });
@@ -69,7 +69,7 @@ class Trip {
               .toList()
           : const [],
       materialId: json['materialId']?.toString(),
-      supplier: json['supplier']?.toString(),
+      supplierId: json['supplierId']?.toString(),
       qtyCf: json['qtyCf'] != null ? double.tryParse(json['qtyCf'].toString()) : null,
       customerName: json['customerName']?.toString(),
     );

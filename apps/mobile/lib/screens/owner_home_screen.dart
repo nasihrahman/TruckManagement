@@ -8,6 +8,7 @@ import 'add_driver_screen.dart';
 import 'add_owner_screen.dart';
 import 'truck_form_screen.dart';
 import 'materials_screen.dart';
+import 'suppliers_screen.dart';
 
 class OwnerHomeScreen extends StatefulWidget {
   const OwnerHomeScreen({super.key, required this.apiService});
@@ -76,6 +77,14 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
     );
   }
 
+  Future<void> _quickSuppliers() async {
+    Navigator.pop(context);
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => SuppliersScreen(apiService: widget.apiService)),
+    );
+  }
+
   void _showQuickActions() {
     showModalBottomSheet(
       context: context,
@@ -106,6 +115,11 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
               leading: const Icon(Icons.inventory_2_outlined),
               title: const Text('Materials'),
               onTap: _quickMaterials,
+            ),
+            ListTile(
+              leading: const Icon(Icons.local_shipping_outlined),
+              title: const Text('Suppliers'),
+              onTap: _quickSuppliers,
             ),
           ],
         ),
