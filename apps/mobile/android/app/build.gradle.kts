@@ -6,7 +6,10 @@ plugins {
 
 android {
     namespace = "com.example.truck_management_mobile"
-    compileSdk = flutter.compileSdkVersion
+    // file_picker's flutter_plugin_android_lifecycle dependency requires
+    // compileSdk 36+; the Flutter tooling default (flutter.compileSdkVersion)
+    // resolves lower than that, so it's pinned explicitly here.
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
