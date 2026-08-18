@@ -4,6 +4,7 @@ import { HitachiJob, Prisma } from '@prisma/client';
 
 const includeRelations = {
   driver: { select: { id: true, firstName: true, lastName: true } },
+  truck: { select: { id: true, plate: true, brand: true } },
 };
 
 @Injectable()

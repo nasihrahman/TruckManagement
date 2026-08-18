@@ -28,6 +28,8 @@ String hitachiPayerLabel(HitachiPayer payer) => payer == HitachiPayer.m ? 'Muthu
 class HitachiJob {
   final String id;
   final String driverId;
+  final String? truckId;
+  final String? truckName;
   final DateTime date;
   final String? customerName;
   final String? place;
@@ -48,6 +50,8 @@ class HitachiJob {
   HitachiJob({
     required this.id,
     required this.driverId,
+    this.truckId,
+    this.truckName,
     required this.date,
     this.customerName,
     this.place,
@@ -87,6 +91,8 @@ class HitachiJob {
     return HitachiJob(
       id: json['id']?.toString() ?? '',
       driverId: json['driverId']?.toString() ?? '',
+      truckId: json['truckId']?.toString(),
+      truckName: (json['truck'] as Map<String, dynamic>?)?['plate']?.toString(),
       date: DateTime.tryParse(json['date']?.toString() ?? '') ?? DateTime.now(),
       customerName: json['customerName']?.toString(),
       place: json['place']?.toString(),

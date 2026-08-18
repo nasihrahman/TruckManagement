@@ -9,6 +9,7 @@ import 'add_owner_screen.dart';
 import 'truck_form_screen.dart';
 import 'materials_screen.dart';
 import 'suppliers_screen.dart';
+import 'hitachi_jobs_screen.dart';
 
 class OwnerHomeScreen extends StatefulWidget {
   const OwnerHomeScreen({super.key, required this.apiService});
@@ -85,6 +86,14 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
     );
   }
 
+  Future<void> _quickHitachiJobs() async {
+    Navigator.pop(context);
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => HitachiJobsScreen(apiService: widget.apiService)),
+    );
+  }
+
   void _showQuickActions() {
     showModalBottomSheet(
       context: context,
@@ -120,6 +129,11 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
               leading: const Icon(Icons.local_shipping_outlined),
               title: const Text('Suppliers'),
               onTap: _quickSuppliers,
+            ),
+            ListTile(
+              leading: const Icon(Icons.construction),
+              title: const Text('Log Hitachi Data'),
+              onTap: _quickHitachiJobs,
             ),
           ],
         ),

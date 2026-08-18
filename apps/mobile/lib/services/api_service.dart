@@ -754,6 +754,7 @@ class ApiService {
 
   Map<String, dynamic> _hitachiJobBody({
     required DateTime date,
+    String? truckId,
     String? customerName,
     String? place,
     double? totalHours,
@@ -772,6 +773,7 @@ class ApiService {
   }) {
     return {
       'date': date.toIso8601String(),
+      if (truckId != null && truckId.isNotEmpty) 'truckId': truckId,
       if (customerName != null && customerName.isNotEmpty) 'customerName': customerName,
       if (place != null && place.isNotEmpty) 'place': place,
       if (totalHours != null) 'totalHours': totalHours,
@@ -792,6 +794,7 @@ class ApiService {
 
   Future<HitachiJob> createHitachiJob({
     required DateTime date,
+    String? truckId,
     String? customerName,
     String? place,
     double? totalHours,
@@ -814,6 +817,7 @@ class ApiService {
         headers: headers,
         body: jsonEncode(_hitachiJobBody(
           date: date,
+          truckId: truckId,
           customerName: customerName,
           place: place,
           totalHours: totalHours,
@@ -842,6 +846,7 @@ class ApiService {
   Future<HitachiJob> updateHitachiJob(
     String id, {
     required DateTime date,
+    String? truckId,
     String? customerName,
     String? place,
     double? totalHours,
@@ -864,6 +869,7 @@ class ApiService {
         headers: headers,
         body: jsonEncode(_hitachiJobBody(
           date: date,
+          truckId: truckId,
           customerName: customerName,
           place: place,
           totalHours: totalHours,

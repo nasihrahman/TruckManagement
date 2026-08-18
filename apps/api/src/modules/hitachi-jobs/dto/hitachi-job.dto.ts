@@ -7,6 +7,10 @@ export class CreateHitachiJobDto {
   @IsString()
   driverId?: string;
 
+  @IsOptional()
+  @IsString()
+  truckId?: string;
+
   @Transform(({ value }) => (value ? new Date(value) : value))
   @IsDate()
   date!: Date;
@@ -73,6 +77,10 @@ export class CreateHitachiJobDto {
 }
 
 export class UpdateHitachiJobDto {
+  @IsOptional()
+  @IsString()
+  truckId?: string;
+
   @IsOptional()
   @Transform(({ value }) => (value ? new Date(value) : value))
   @IsDate()

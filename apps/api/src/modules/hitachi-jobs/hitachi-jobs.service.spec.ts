@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { HitachiJobsService } from './hitachi-jobs.service';
 import { HitachiJobsRepository } from './hitachi-jobs.repository';
 
@@ -59,11 +59,17 @@ describe('HitachiJobsService', () => {
       );
     });
 
-    it('throws BadRequestException when an OWNER omits driverId', async () => {
-      await expect(
-        service.create({ userId: 'owner-1', role: 'OWNER', companyId: 'company-1' }, { date: mockJob.date } as any),
-      ).rejects.toThrow(BadRequestException);
-      expect(mockRepository.create).not.toHaveBeenCalled();
+    it('defaults driverId to the caller when an OWNER omits it (logging their own entry)', async () => {
+      mockRepository.create.mockResolvedValue(mockJob);
+
+      await service.create(
+        { userId: 'owner-1', role: 'OWNER', companyId: 'company-1' },
+        { date: mockJob.date } as any,
+      );
+
+      expect(mockRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ driverId: 'owner-1', companyId: 'company-1' }),
+      );
     });
   });
 

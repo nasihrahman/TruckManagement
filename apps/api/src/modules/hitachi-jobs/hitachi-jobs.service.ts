@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { HitachiJob, HitachiPayer } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
 import { HitachiJobsRepository } from './hitachi-jobs.repository';
@@ -39,10 +39,9 @@ export class HitachiJobsService {
   constructor(private readonly hitachiJobsRepository: HitachiJobsRepository) {}
 
   async create(user: RequestUser, dto: CreateHitachiJobDto): Promise<HitachiJob> {
-    const driverId = user.role === 'DRIVER' ? user.userId : dto.driverId;
-    if (!driverId) {
-      throw new BadRequestException('driverId is required');
-    }
+    // Owner logging their own entry (not on a driver's behalf) simply omits
+    // driverId and defaults to self, same as a Driver always does.
+    const driverId = user.role === 'DRIVER' ? user.userId : dto.driverId ?? user.userId;
 
     return this.hitachiJobsRepository.create({
       ...dto,
@@ -90,9 +89,18 @@ export class HitachiJobsService {
     const driverId = user.role === 'DRIVER' ? user.userId : undefined;
     const jobs = await this.hitachiJobsRepository.findForExport(user.companyId, driverId, range);
 
+    // One sheet per Hitachi vehicle, same pattern as the per-truck trips
+    // export — jobs without a truck picked land in an "Unassigned" sheet.
+    const groups = new Map<string, { name: string; jobs: typeof jobs }>();
+    for (const job of jobs) {
+      const key = job.truck?.id ?? 'unassigned';
+      const name = job.truck ? job.truck.plate : 'Unassigned';
+      if (!groups.has(key)) groups.set(key, { name, jobs: [] });
+      groups.get(key)!.jobs.push(job);
+    }
+
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Hitachi Jobs');
-    sheet.columns = [
+    const columns = [
       { header: 'Date', key: 'date', width: 12 },
       { header: 'Driver', key: 'driver', width: 18 },
       { header: 'Customer', key: 'customerName', width: 18 },
@@ -112,31 +120,49 @@ export class HitachiJobsService {
       { header: 'Bal Amt (Jamal)', key: 'balanceJ', width: 14 },
       { header: 'Photo', key: 'photoUrl', width: 30 },
     ];
-    sheet.getRow(1).font = { bold: true };
 
-    for (const job of jobs) {
-      sheet.addRow({
-        date: job.date.toISOString().slice(0, 10),
-        driver: job.driver
-          ? [job.driver.firstName, job.driver.lastName].filter(Boolean).join(' ') || 'Driver'
-          : '',
-        customerName: job.customerName ?? '',
-        place: job.place ?? '',
-        totalHours: job.totalHours ? Number(job.totalHours) : '',
-        paymentReceived: job.paymentReceived ? Number(job.paymentReceived) : '',
-        paymentReceivedBy: job.paymentReceivedBy ? PAYER_LABEL[job.paymentReceivedBy] : '',
-        nDiesel: job.nDieselExpense ? Number(job.nDieselExpense) : '',
-        nDieselPaidBy: job.nDieselPaidBy ? PAYER_LABEL[job.nDieselPaidBy] : '',
-        hDiesel: job.hDieselExpense ? Number(job.hDieselExpense) : '',
-        hDieselPaidBy: job.hDieselPaidBy ? PAYER_LABEL[job.hDieselPaidBy] : '',
-        opBata: job.opBata ? Number(job.opBata) : '',
-        opBataPaidBy: job.opBataPaidBy ? PAYER_LABEL[job.opBataPaidBy] : '',
-        otherExpenseM: job.otherExpenseM ? Number(job.otherExpenseM) : '',
-        otherExpenseJ: job.otherExpenseJ ? Number(job.otherExpenseJ) : '',
-        salaryAdvance: job.salaryAdvance ? Number(job.salaryAdvance) : '',
-        balanceJ: balanceJ(job),
-        photoUrl: job.photoUrl ?? '',
-      });
+    const usedNames = new Set<string>();
+    for (const { name, jobs: vehicleJobs } of groups.values()) {
+      let sheetName = name.replace(/[*?:/\\[\]]/g, ' ').trim().slice(0, 31) || 'Vehicle';
+      let suffix = 2;
+      while (usedNames.has(sheetName)) {
+        sheetName = `${sheetName.slice(0, 28)} (${suffix++})`;
+      }
+      usedNames.add(sheetName);
+
+      const sheet = workbook.addWorksheet(sheetName);
+      sheet.columns = columns;
+      sheet.getRow(1).font = { bold: true };
+
+      for (const job of vehicleJobs) {
+        sheet.addRow({
+          date: job.date.toISOString().slice(0, 10),
+          driver: job.driver
+            ? [job.driver.firstName, job.driver.lastName].filter(Boolean).join(' ') || 'Driver'
+            : '',
+          customerName: job.customerName ?? '',
+          place: job.place ?? '',
+          totalHours: job.totalHours ? Number(job.totalHours) : '',
+          paymentReceived: job.paymentReceived ? Number(job.paymentReceived) : '',
+          paymentReceivedBy: job.paymentReceivedBy ? PAYER_LABEL[job.paymentReceivedBy] : '',
+          nDiesel: job.nDieselExpense ? Number(job.nDieselExpense) : '',
+          nDieselPaidBy: job.nDieselPaidBy ? PAYER_LABEL[job.nDieselPaidBy] : '',
+          hDiesel: job.hDieselExpense ? Number(job.hDieselExpense) : '',
+          hDieselPaidBy: job.hDieselPaidBy ? PAYER_LABEL[job.hDieselPaidBy] : '',
+          opBata: job.opBata ? Number(job.opBata) : '',
+          opBataPaidBy: job.opBataPaidBy ? PAYER_LABEL[job.opBataPaidBy] : '',
+          otherExpenseM: job.otherExpenseM ? Number(job.otherExpenseM) : '',
+          otherExpenseJ: job.otherExpenseJ ? Number(job.otherExpenseJ) : '',
+          salaryAdvance: job.salaryAdvance ? Number(job.salaryAdvance) : '',
+          balanceJ: balanceJ(job),
+          photoUrl: job.photoUrl ?? '',
+        });
+      }
+    }
+
+    if (workbook.worksheets.length === 0) {
+      const sheet = workbook.addWorksheet('Hitachi Jobs');
+      sheet.columns = columns;
     }
 
     const buffer = await workbook.xlsx.writeBuffer();

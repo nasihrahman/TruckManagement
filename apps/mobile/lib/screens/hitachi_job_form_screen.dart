@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/hitachi_job.dart';
+import '../models/truck.dart';
 import '../services/api_service.dart';
 import '../widgets/photo_picker_field.dart';
 
@@ -31,7 +32,10 @@ class _HitachiJobFormScreenState extends State<HitachiJobFormScreen> {
   HitachiPayer? _hDieselPaidBy;
   HitachiPayer? _opBataPaidBy;
   String? _photoUrl;
+  String? _selectedTruckId;
+  List<Truck> _hitachiTrucks = [];
   bool _isLoading = false;
+  bool _isLoadingTrucks = true;
 
   bool get _isEditing => widget.existing != null;
 
@@ -40,6 +44,8 @@ class _HitachiJobFormScreenState extends State<HitachiJobFormScreen> {
     super.initState();
     final existing = widget.existing;
     _date = existing?.date ?? DateTime.now();
+    _selectedTruckId = existing?.truckId;
+    _loadTrucks();
     _customerController = TextEditingController(text: existing?.customerName ?? '');
     _placeController = TextEditingController(text: existing?.place ?? '');
     _totalHoursController = TextEditingController(text: existing?.totalHours?.toString() ?? '');
@@ -72,6 +78,19 @@ class _HitachiJobFormScreenState extends State<HitachiJobFormScreen> {
     super.dispose();
   }
 
+  Future<void> _loadTrucks() async {
+    try {
+      final trucks = await widget.apiService.fetchTrucks();
+      if (!mounted) return;
+      setState(() => _hitachiTrucks = trucks.where((t) => t.isHitachi).toList());
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _isLoadingTrucks = false);
+    }
+  }
+
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -91,6 +110,7 @@ class _HitachiJobFormScreenState extends State<HitachiJobFormScreen> {
         await widget.apiService.updateHitachiJob(
           widget.existing!.id,
           date: _date,
+          truckId: _selectedTruckId,
           customerName: _customerController.text.trim(),
           place: _placeController.text.trim(),
           totalHours: double.tryParse(_totalHoursController.text.trim()),
@@ -110,6 +130,7 @@ class _HitachiJobFormScreenState extends State<HitachiJobFormScreen> {
       } else {
         await widget.apiService.createHitachiJob(
           date: _date,
+          truckId: _selectedTruckId,
           customerName: _customerController.text.trim(),
           place: _placeController.text.trim(),
           totalHours: double.tryParse(_totalHoursController.text.trim()),
@@ -197,6 +218,24 @@ class _HitachiJobFormScreenState extends State<HitachiJobFormScreen> {
                 icon: const Icon(Icons.calendar_month, size: 18),
                 label: Text('${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}'),
               ),
+              const SizedBox(height: 16),
+              const Text('Vehicle', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              _isLoadingTrucks
+                  ? const SizedBox(
+                      height: 48,
+                      child: Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))),
+                    )
+                  : DropdownButtonFormField<String>(
+                      initialValue: _selectedTruckId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(border: OutlineInputBorder()),
+                      hint: const Text('Select vehicle'),
+                      items: _hitachiTrucks
+                          .map((t) => DropdownMenuItem<String>(value: t.id, child: Text(t.displayName)))
+                          .toList(),
+                      onChanged: (val) => setState(() => _selectedTruckId = val),
+                    ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _customerController,

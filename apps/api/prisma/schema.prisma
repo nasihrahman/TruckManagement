@@ -75,6 +75,7 @@ model Truck {
   maintenance    MaintenanceRecord[]
   trips          Trip[]
   defaultForDrivers User[]
+  hitachiJobs    HitachiJob[]
 }
 
 model Material {
@@ -105,6 +106,8 @@ model HitachiJob {
   companyId         String
   driver            User          @relation(fields: [driverId], references: [id])
   driverId          String
+  truck             Truck?        @relation(fields: [truckId], references: [id])
+  truckId           String?
   date              DateTime
   customerName      String?
   place             String?

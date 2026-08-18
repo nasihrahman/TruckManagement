@@ -107,6 +107,7 @@ class _HitachiJobsScreenState extends State<HitachiJobsScreen> {
                   title: Text(title.isEmpty ? 'Hitachi Job' : title),
                   subtitle: Text(
                     '${_formatDate(job.date)}'
+                    '${job.truckName != null ? ' · ${job.truckName}' : ''}'
                     '${job.totalHours != null ? ' · ${job.totalHours} hrs' : ''}'
                     ' · Bal (J): ₹${job.balanceJ.toStringAsFixed(0)}',
                   ),
