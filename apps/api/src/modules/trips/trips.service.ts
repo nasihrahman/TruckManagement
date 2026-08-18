@@ -182,6 +182,7 @@ export class TripsService {
       { header: 'Fine', key: 'fineTotal', width: 12 },
       { header: 'Other', key: 'otherTotal', width: 12 },
       { header: 'Expense Reasons', key: 'expenseReasons', width: 32 },
+      { header: 'Photo URLs', key: 'photoUrls', width: 40 },
     ];
 
     const usedNames = new Set<string>();
@@ -207,6 +208,10 @@ export class TripsService {
           .filter((e) => e.reason || e.notes)
           .map((e) => `${e.category}: ${e.reason ?? e.notes}`)
           .join('; ');
+        const photoUrls = trip.expenses
+          .filter((e) => e.photoUrl)
+          .map((e) => `${e.category}: ${e.photoUrl}`)
+          .join('; ');
 
         sheet.addRow({
           scheduledAt: trip.scheduledAt ? trip.scheduledAt.toISOString().slice(0, 10) : '',
@@ -223,6 +228,7 @@ export class TripsService {
           fineTotal: totalByCategory('FINE'),
           otherTotal: totalByCategory('OTHER'),
           expenseReasons,
+          photoUrls,
         });
       }
     }

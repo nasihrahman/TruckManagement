@@ -107,7 +107,7 @@ export class TripsRepository {
         truck: { select: { id: true, plate: true, brand: true } },
         material: { select: { name: true } },
         supplier: { select: { name: true } },
-        expenses: { select: { amount: true, category: true, reason: true, notes: true } },
+        expenses: { select: { amount: true, category: true, reason: true, notes: true, photoUrl: true } },
       },
     });
   }

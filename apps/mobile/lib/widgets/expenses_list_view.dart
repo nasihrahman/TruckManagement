@@ -51,6 +51,34 @@ class ExpensesListViewState extends State<ExpensesListView> {
     if (saved == true) refresh();
   }
 
+  Future<void> _viewPhoto(String url) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              child: Image.network(
+                url,
+                errorBuilder: (context, error, stackTrace) => const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Icon(Icons.broken_image_outlined, size: 48),
+                ),
+              ),
+            ),
+            IconButton.filled(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(context),
+              style: IconButton.styleFrom(backgroundColor: Colors.black54),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _confirmDelete(Expense expense) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -117,21 +145,41 @@ class ExpensesListViewState extends State<ExpensesListView> {
                         if (expense.notes != null && expense.notes!.isNotEmpty) expense.notes!,
                       ].join(' · '),
                     ),
-                    trailing: closed
-                        ? null
-                        : Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit, size: 18),
-                                onPressed: () => _openForm(existing: expense),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (expense.photoUrl != null && expense.photoUrl!.isNotEmpty)
+                          InkWell(
+                            borderRadius: BorderRadius.circular(6),
+                            onTap: () => _viewPhoto(expense.photoUrl!),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: Image.network(
+                                expense.photoUrl!,
+                                width: 40,
+                                height: 40,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  width: 40,
+                                  height: 40,
+                                  color: Colors.grey.shade200,
+                                  child: const Icon(Icons.broken_image_outlined, size: 18),
+                                ),
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline, size: 18),
-                                onPressed: () => _confirmDelete(expense),
-                              ),
-                            ],
+                            ),
                           ),
+                        if (!closed) ...[
+                          IconButton(
+                            icon: const Icon(Icons.edit, size: 18),
+                            onPressed: () => _openForm(existing: expense),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 18),
+                            onPressed: () => _confirmDelete(expense),
+                          ),
+                        ],
+                      ],
+                    ),
                     onTap: closed ? null : () => _openForm(existing: expense),
                   );
                 },
