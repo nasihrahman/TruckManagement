@@ -238,19 +238,6 @@ class _OwnerTripDetailScreenState extends State<OwnerTripDetailScreen> {
               ),
             ),
             const Divider(height: 1),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              color: Colors.grey.shade100,
-              child: Row(
-                children: const [
-                  Icon(Icons.location_on_outlined, size: 18, color: Colors.grey),
-                  SizedBox(width: 8),
-                  Text('Live location — coming soon', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
             const Padding(
               padding: EdgeInsets.all(12),
               child: Align(
