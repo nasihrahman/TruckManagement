@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/expense.dart';
 import '../services/api_service.dart';
+import '../widgets/photo_picker_field.dart';
 
 class ExpenseFormScreen extends StatefulWidget {
   const ExpenseFormScreen({super.key, required this.apiService, required this.tripId, this.existing});
@@ -20,6 +21,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   late final TextEditingController _odometerController;
   late final TextEditingController _reasonController;
   late final TextEditingController _notesController;
+  String? _photoUrl;
   bool _isLoading = false;
 
   bool get _isEditing => widget.existing != null;
@@ -33,6 +35,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     _odometerController = TextEditingController(text: existing?.odometer?.toString() ?? '');
     _reasonController = TextEditingController(text: existing?.reason ?? '');
     _notesController = TextEditingController(text: existing?.notes ?? '');
+    _photoUrl = existing?.photoUrl;
   }
 
   @override
@@ -61,6 +64,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           odometer: _category == ExpenseCategory.fuel ? odometer : null,
           reason: _category == ExpenseCategory.fine ? _reasonController.text : null,
           notes: _notesController.text,
+          photoUrl: _photoUrl,
         );
       } else {
         await widget.apiService.createExpense(
@@ -70,6 +74,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           odometer: _category == ExpenseCategory.fuel ? odometer : null,
           reason: _category == ExpenseCategory.fine ? _reasonController.text : null,
           notes: _notesController.text,
+          photoUrl: _photoUrl,
         );
       }
 
@@ -141,6 +146,14 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                   maxLines: 2,
                 ),
               ],
+              const SizedBox(height: 16),
+              const Text('Receipt Photo', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              PhotoPickerField(
+                apiService: widget.apiService,
+                photoUrl: _photoUrl,
+                onChanged: (url) => setState(() => _photoUrl = url),
+              ),
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: _isLoading ? null : _submit,

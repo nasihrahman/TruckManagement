@@ -11,6 +11,8 @@ import { OwnersModule } from './modules/owners/owners.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { MaterialsModule } from './modules/materials/materials.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
+import { HitachiJobsModule } from './modules/hitachi-jobs/hitachi-jobs.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { SuppliersModule } from './modules/suppliers/suppliers.module';
     ReportsModule,
     MaterialsModule,
     SuppliersModule,
+    HitachiJobsModule,
+    UploadsModule,
   ],
 })
 export class AppModule {}

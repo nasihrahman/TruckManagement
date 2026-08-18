@@ -24,6 +24,7 @@ model Company {
   locationPings LocationPing[]
   materials    Material[]
   suppliers    Supplier[]
+  hitachiJobs  HitachiJob[]
 }
 
 model User {
@@ -47,6 +48,7 @@ model User {
   driverShifts            DriverShift[]
   locationPings           LocationPing[]
   expenses                Expense[]
+  hitachiJobs             HitachiJob[]
 }
 
 model DriverProfile {
@@ -95,6 +97,36 @@ model Supplier {
   trips     Trip[]
 
   @@unique([companyId, name])
+}
+
+model HitachiJob {
+  id                String        @id @default(cuid())
+  company           Company       @relation(fields: [companyId], references: [id])
+  companyId         String
+  driver            User          @relation(fields: [driverId], references: [id])
+  driverId          String
+  date              DateTime
+  customerName      String?
+  place             String?
+  totalHours        Decimal?      @db.Decimal(10, 2)
+  paymentReceived   Decimal?      @db.Decimal(10, 2)
+  paymentReceivedBy HitachiPayer?
+  nDieselExpense    Decimal?      @db.Decimal(10, 2)
+  nDieselPaidBy     HitachiPayer?
+  hDieselExpense    Decimal?      @db.Decimal(10, 2)
+  hDieselPaidBy     HitachiPayer?
+  opBata            Decimal?      @db.Decimal(10, 2)
+  opBataPaidBy      HitachiPayer?
+  otherExpenseM     Decimal?      @db.Decimal(10, 2)
+  otherExpenseJ     Decimal?      @db.Decimal(10, 2)
+  salaryAdvance     Decimal?      @db.Decimal(10, 2)
+  photoUrl          String?
+  createdAt         DateTime      @default(now())
+}
+
+enum HitachiPayer {
+  M
+  J
 }
 
 model Trip {

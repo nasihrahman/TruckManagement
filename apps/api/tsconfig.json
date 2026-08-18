@@ -5,7 +5,7 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["node", "jest"],
+    "types": ["node", "jest", "multer"],
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "outDir": "dist",

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/trip.dart';
 import '../models/driver.dart';
@@ -9,6 +10,7 @@ import '../models/truck.dart';
 import '../models/owner.dart';
 import '../models/material.dart';
 import '../models/supplier.dart';
+import '../models/hitachi_job.dart';
 
 class ApiService {
   ApiService({required this.baseUrl});
@@ -28,12 +30,42 @@ class ApiService {
     _refreshToken = prefs.getString('refresh_token');
   }
 
-  Future<void> saveTokens(String accessToken, String refreshToken) async {
+  Future<void> saveTokens(
+    String accessToken,
+    String refreshToken, {
+    String? role,
+    bool? mustChangePassword,
+  }) async {
     _token = accessToken;
     _refreshToken = refreshToken;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('auth_token', accessToken);
     await prefs.setString('refresh_token', refreshToken);
+    if (role != null) await prefs.setString('user_role', role);
+    if (mustChangePassword != null) await prefs.setBool('must_change_password', mustChangePassword);
+  }
+
+  /// Whether a saved session exists on this device — checked at app startup
+  /// so a valid login survives an app restart / page reload instead of
+  /// always bouncing back to the login screen.
+  Future<bool> hasStoredSession() async {
+    await _loadTokens();
+    return _refreshToken != null;
+  }
+
+  Future<String?> getStoredRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_role');
+  }
+
+  Future<bool> getStoredMustChangePassword() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('must_change_password') ?? false;
+  }
+
+  Future<void> markPasswordChanged() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('must_change_password', false);
   }
 
   Future<void> clearToken() async {
@@ -42,6 +74,8 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await prefs.remove('refresh_token');
+    await prefs.remove('user_role');
+    await prefs.remove('must_change_password');
   }
 
   Future<Map<String, String>> _headers({bool auth = false}) async {
@@ -73,6 +107,62 @@ class ApiService {
       }
     }
     return response;
+  }
+
+  /// Guesses an image MIME type from a filename extension. `MultipartFile`
+  /// defaults to `application/octet-stream` when no contentType is given,
+  /// which the backend's image-only filter rejects — so this can't be skipped.
+  MediaType _imageMediaType(String filename) {
+    final ext = filename.toLowerCase().split('.').last;
+    switch (ext) {
+      case 'png':
+        return MediaType('image', 'png');
+      case 'webp':
+        return MediaType('image', 'webp');
+      case 'heic':
+        return MediaType('image', 'heic');
+      case 'gif':
+        return MediaType('image', 'gif');
+      case 'jpg':
+      case 'jpeg':
+      default:
+        return MediaType('image', 'jpeg');
+    }
+  }
+
+  /// Uploads an image (already compressed client-side by the caller) and
+  /// returns its hosted URL. Built separately from `_send` since multipart
+  /// requests need their own Content-Type (with boundary), not the JSON one
+  /// `_headers` always sets.
+  Future<String> uploadImage(Uint8List bytes, String filename) async {
+    Future<http.StreamedResponse> attempt() async {
+      await _loadTokens();
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/uploads'));
+      if (_token != null) request.headers['Authorization'] = 'Bearer $_token';
+      request.files.add(http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: _imageMediaType(filename),
+      ));
+      return request.send();
+    }
+
+    var streamed = await attempt();
+    if (streamed.statusCode == 401) {
+      final refreshed = await _refreshAccessToken();
+      if (refreshed) {
+        streamed = await attempt();
+      } else {
+        onSessionExpired?.call();
+      }
+    }
+    final response = await http.Response.fromStream(streamed);
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Image upload failed');
+    }
+    return body['url'] as String;
   }
 
   Future<bool> _refreshAccessToken() {
@@ -111,7 +201,12 @@ class ApiService {
     if (response.statusCode >= 400) {
       throw Exception(body['message'] ?? 'Login failed');
     }
-    await saveTokens(body['accessToken'], body['refreshToken']);
+    await saveTokens(
+      body['accessToken'],
+      body['refreshToken'],
+      role: body['role']?.toString(),
+      mustChangePassword: body['mustChangePassword'] == true,
+    );
     return body;
   }
 
@@ -643,6 +738,180 @@ class ApiService {
     return response.bodyBytes;
   }
 
+  Future<List<HitachiJob>> fetchHitachiJobs() async {
+    final response = await _send(
+      (headers) => http.get(Uri.parse('$baseUrl/hitachi-jobs'), headers: headers),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(data['message'] ?? 'Unable to fetch Hitachi jobs');
+    }
+    if (data is List) {
+      return data.map((item) => HitachiJob.fromJson(item as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  Map<String, dynamic> _hitachiJobBody({
+    required DateTime date,
+    String? customerName,
+    String? place,
+    double? totalHours,
+    double? paymentReceived,
+    HitachiPayer? paymentReceivedBy,
+    double? nDieselExpense,
+    HitachiPayer? nDieselPaidBy,
+    double? hDieselExpense,
+    HitachiPayer? hDieselPaidBy,
+    double? opBata,
+    HitachiPayer? opBataPaidBy,
+    double? otherExpenseM,
+    double? otherExpenseJ,
+    double? salaryAdvance,
+    String? photoUrl,
+  }) {
+    return {
+      'date': date.toIso8601String(),
+      if (customerName != null && customerName.isNotEmpty) 'customerName': customerName,
+      if (place != null && place.isNotEmpty) 'place': place,
+      if (totalHours != null) 'totalHours': totalHours,
+      if (paymentReceived != null) 'paymentReceived': paymentReceived,
+      if (paymentReceivedBy != null) 'paymentReceivedBy': hitachiPayerToJson(paymentReceivedBy),
+      if (nDieselExpense != null) 'nDieselExpense': nDieselExpense,
+      if (nDieselPaidBy != null) 'nDieselPaidBy': hitachiPayerToJson(nDieselPaidBy),
+      if (hDieselExpense != null) 'hDieselExpense': hDieselExpense,
+      if (hDieselPaidBy != null) 'hDieselPaidBy': hitachiPayerToJson(hDieselPaidBy),
+      if (opBata != null) 'opBata': opBata,
+      if (opBataPaidBy != null) 'opBataPaidBy': hitachiPayerToJson(opBataPaidBy),
+      if (otherExpenseM != null) 'otherExpenseM': otherExpenseM,
+      if (otherExpenseJ != null) 'otherExpenseJ': otherExpenseJ,
+      if (salaryAdvance != null) 'salaryAdvance': salaryAdvance,
+      if (photoUrl != null && photoUrl.isNotEmpty) 'photoUrl': photoUrl,
+    };
+  }
+
+  Future<HitachiJob> createHitachiJob({
+    required DateTime date,
+    String? customerName,
+    String? place,
+    double? totalHours,
+    double? paymentReceived,
+    HitachiPayer? paymentReceivedBy,
+    double? nDieselExpense,
+    HitachiPayer? nDieselPaidBy,
+    double? hDieselExpense,
+    HitachiPayer? hDieselPaidBy,
+    double? opBata,
+    HitachiPayer? opBataPaidBy,
+    double? otherExpenseM,
+    double? otherExpenseJ,
+    double? salaryAdvance,
+    String? photoUrl,
+  }) async {
+    final response = await _send(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/hitachi-jobs'),
+        headers: headers,
+        body: jsonEncode(_hitachiJobBody(
+          date: date,
+          customerName: customerName,
+          place: place,
+          totalHours: totalHours,
+          paymentReceived: paymentReceived,
+          paymentReceivedBy: paymentReceivedBy,
+          nDieselExpense: nDieselExpense,
+          nDieselPaidBy: nDieselPaidBy,
+          hDieselExpense: hDieselExpense,
+          hDieselPaidBy: hDieselPaidBy,
+          opBata: opBata,
+          opBataPaidBy: opBataPaidBy,
+          otherExpenseM: otherExpenseM,
+          otherExpenseJ: otherExpenseJ,
+          salaryAdvance: salaryAdvance,
+          photoUrl: photoUrl,
+        )),
+      ),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Unable to log Hitachi job');
+    }
+    return HitachiJob.fromJson(body);
+  }
+
+  Future<HitachiJob> updateHitachiJob(
+    String id, {
+    required DateTime date,
+    String? customerName,
+    String? place,
+    double? totalHours,
+    double? paymentReceived,
+    HitachiPayer? paymentReceivedBy,
+    double? nDieselExpense,
+    HitachiPayer? nDieselPaidBy,
+    double? hDieselExpense,
+    HitachiPayer? hDieselPaidBy,
+    double? opBata,
+    HitachiPayer? opBataPaidBy,
+    double? otherExpenseM,
+    double? otherExpenseJ,
+    double? salaryAdvance,
+    String? photoUrl,
+  }) async {
+    final response = await _send(
+      (headers) => http.patch(
+        Uri.parse('$baseUrl/hitachi-jobs/$id'),
+        headers: headers,
+        body: jsonEncode(_hitachiJobBody(
+          date: date,
+          customerName: customerName,
+          place: place,
+          totalHours: totalHours,
+          paymentReceived: paymentReceived,
+          paymentReceivedBy: paymentReceivedBy,
+          nDieselExpense: nDieselExpense,
+          nDieselPaidBy: nDieselPaidBy,
+          hDieselExpense: hDieselExpense,
+          hDieselPaidBy: hDieselPaidBy,
+          opBata: opBata,
+          opBataPaidBy: opBataPaidBy,
+          otherExpenseM: otherExpenseM,
+          otherExpenseJ: otherExpenseJ,
+          salaryAdvance: salaryAdvance,
+          photoUrl: photoUrl,
+        )),
+      ),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Unable to update Hitachi job');
+    }
+    return HitachiJob.fromJson(body);
+  }
+
+  Future<Uint8List> exportHitachiJobs({String? period, DateTime? date}) async {
+    final query = {
+      if (period != null) 'period': period,
+      if (date != null) 'date': date.toIso8601String(),
+    };
+    final uri = Uri.parse('$baseUrl/hitachi-jobs/export.xlsx').replace(queryParameters: query.isEmpty ? null : query);
+    final response = await _send((headers) => http.get(uri, headers: headers));
+    if (response.statusCode >= 400) {
+      throw Exception('Unable to export Hitachi jobs');
+    }
+    return response.bodyBytes;
+  }
+
+  Future<void> deleteHitachiJob(String id) async {
+    final response = await _send(
+      (headers) => http.delete(Uri.parse('$baseUrl/hitachi-jobs/$id'), headers: headers),
+    );
+    if (response.statusCode >= 400) {
+      final body = jsonDecode(response.body);
+      throw Exception(body['message'] ?? 'Unable to delete Hitachi job');
+    }
+  }
+
   Future<List<Expense>> fetchExpenses(String tripId) async {
     final response = await _send(
       (headers) => http.get(Uri.parse('$baseUrl/trips/$tripId/expenses'), headers: headers),
@@ -664,6 +933,7 @@ class ApiService {
     int? odometer,
     String? reason,
     String? notes,
+    String? photoUrl,
   }) async {
     final response = await _send(
       (headers) => http.post(
@@ -675,6 +945,7 @@ class ApiService {
           if (odometer != null) 'odometer': odometer,
           if (reason != null && reason.isNotEmpty) 'reason': reason,
           if (notes != null && notes.isNotEmpty) 'notes': notes,
+          if (photoUrl != null && photoUrl.isNotEmpty) 'photoUrl': photoUrl,
         }),
       ),
     );
@@ -693,6 +964,7 @@ class ApiService {
     int? odometer,
     String? reason,
     String? notes,
+    String? photoUrl,
   }) async {
     final response = await _send(
       (headers) => http.patch(
@@ -704,6 +976,7 @@ class ApiService {
           'odometer': odometer,
           'reason': reason,
           'notes': notes,
+          if (photoUrl != null && photoUrl.isNotEmpty) 'photoUrl': photoUrl,
         }),
       ),
     );

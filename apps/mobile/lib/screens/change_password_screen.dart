@@ -30,6 +30,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     setState(() => _isLoading = true);
     try {
       await widget.apiService.changePassword(_passwordController.text);
+      await widget.apiService.markPasswordChanged();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password updated successfully!')),

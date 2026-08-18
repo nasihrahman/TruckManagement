@@ -26,6 +26,7 @@ class OwnerDashboardTabState extends State<OwnerDashboardTab> {
   Future<_DashboardData>? _dataFuture;
   bool _isExporting = false;
   bool _isExportingByTruck = false;
+  bool _isExportingHitachi = false;
 
   @override
   void initState() {
@@ -91,6 +92,21 @@ class OwnerDashboardTabState extends State<OwnerDashboardTab> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _isExportingByTruck = false);
+    }
+  }
+
+  Future<void> _exportHitachi() async {
+    setState(() => _isExportingHitachi = true);
+    try {
+      final bytes = await widget.apiService.exportHitachiJobs();
+      downloadBytes(bytes, 'hitachi-jobs-export.xlsx');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export downloaded')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _isExportingHitachi = false);
     }
   }
 
@@ -275,6 +291,17 @@ class OwnerDashboardTabState extends State<OwnerDashboardTab> {
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.local_shipping_outlined),
                     label: const Text('Export by Truck to Excel'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _isExportingHitachi ? null : _exportHitachi,
+                    icon: _isExportingHitachi
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.construction_outlined),
+                    label: const Text('Export Hitachi Jobs to Excel'),
                   ),
                 ),
               ],

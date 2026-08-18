@@ -65,6 +65,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
   bool _isExporting = false;
   bool _isExportingDetail = false;
   bool _isExportingByTruck = false;
+  bool _isExportingHitachi = false;
   late Future<Map<String, dynamic>> _reportFuture;
 
   static const _periodLabels = {
@@ -145,6 +146,21 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _isExportingByTruck = false);
+    }
+  }
+
+  Future<void> _exportHitachi() async {
+    setState(() => _isExportingHitachi = true);
+    try {
+      final bytes = await widget.apiService.exportHitachiJobs(period: _period, date: _anchorDate);
+      downloadBytes(bytes, 'hitachi-jobs-$_period.xlsx');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export downloaded')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _isExportingHitachi = false);
     }
   }
 
@@ -334,6 +350,17 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
                               ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                               : const Icon(Icons.local_shipping_outlined),
                           label: const Text('Export by Truck (Fuel/Fine/Other)'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _isExportingHitachi ? null : _exportHitachi,
+                          icon: _isExportingHitachi
+                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.construction_outlined),
+                          label: const Text('Export Hitachi Jobs'),
                         ),
                       ),
                     ],

@@ -7,6 +7,7 @@ import '../services/tracking_notification_service.dart';
 import '../widgets/app_brand_title.dart';
 import 'trip_detail_screen.dart';
 import 'trip_form_screen.dart';
+import 'hitachi_jobs_screen.dart';
 
 class DriverTripsScreen extends StatefulWidget {
   const DriverTripsScreen({super.key, required this.apiService});
@@ -166,6 +167,14 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
       appBar: AppBar(
         title: const AppBrandTitle(title: 'My Trips'),
         actions: [
+          IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => HitachiJobsScreen(apiService: widget.apiService)),
+            ),
+            tooltip: 'Hitachi Jobs',
+            icon: const Icon(Icons.construction),
+          ),
           IconButton(
             onPressed: _refreshTrips,
             icon: const Icon(Icons.refresh),
