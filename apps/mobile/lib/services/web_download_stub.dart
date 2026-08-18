@@ -1,14 +1,13 @@
-import 'dart:io';
 import 'dart:typed_data';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:file_picker/file_picker.dart';
 
-/// On Android/iOS there's no browser download bar, so the exported file is
-/// written to a temp dir and handed to the OS share sheet — the user picks
-/// "Save to Files", opens it directly in Excel, shares via WhatsApp, etc.
-Future<void> downloadBytes(Uint8List bytes, String filename) async {
-  final dir = await getTemporaryDirectory();
-  final file = File('${dir.path}/$filename');
-  await file.writeAsBytes(bytes);
-  await Share.shareXFiles([XFile(file.path)], text: filename);
+/// Opens Android/iOS's native "Save As" dialog and writes the bytes directly
+/// to wherever the user picks (Downloads, etc.) — a real download, not a
+/// share-sheet detour. Returns false if the user cancelled the dialog.
+Future<bool> downloadBytes(Uint8List bytes, String filename) async {
+  final path = await FilePicker.platform.saveFile(
+    fileName: filename,
+    bytes: bytes,
+  );
+  return path != null;
 }
