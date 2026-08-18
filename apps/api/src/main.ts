@@ -20,8 +20,9 @@ async function bootstrap() {
     origin: '*', // Allows requests from any frontend port
   });
   
-  await app.listen(3000);
-  console.log(`API listening on http://localhost:3000/api/v1`);
+  const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+  await app.listen(port);
+  console.log(`API listening on port ${port} (/api/v1)`);
 }
 
 bootstrap();

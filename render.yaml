@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: truckmanagement-api
+    runtime: node
+    plan: free
+    rootDir: .
+    buildCommand: npm install && npx prisma generate --schema=apps/api/prisma/schema.prisma && npm run build --workspace=apps/api
+    startCommand: node apps/api/dist/main.js
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRATION
+        value: 15m
+      - key: JWT_REFRESH_EXPIRATION
+        value: 30d
