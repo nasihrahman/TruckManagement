@@ -1,7 +1,7 @@
 import 'dart:html' as html;
 import 'dart:typed_data';
 
-void downloadBytes(Uint8List bytes, String filename) {
+Future<void> downloadBytes(Uint8List bytes, String filename) async {
   final blob = html.Blob([bytes]);
   final url = html.Url.createObjectUrlFromBlob(blob);
   html.AnchorElement(href: url)

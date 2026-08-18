@@ -69,7 +69,7 @@ class OwnerDashboardTabState extends State<OwnerDashboardTab> {
     setState(() => _isExporting = true);
     try {
       final bytes = await widget.apiService.exportTripsExcel();
-      downloadBytes(bytes, 'trips-export.xlsx');
+      await downloadBytes(bytes, 'trips-export.xlsx');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export downloaded')));
     } catch (e) {
@@ -84,7 +84,7 @@ class OwnerDashboardTabState extends State<OwnerDashboardTab> {
     setState(() => _isExportingByTruck = true);
     try {
       final bytes = await widget.apiService.exportTripsByTruckExcel();
-      downloadBytes(bytes, 'trips-by-truck-export.xlsx');
+      await downloadBytes(bytes, 'trips-by-truck-export.xlsx');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export downloaded')));
     } catch (e) {
@@ -99,7 +99,7 @@ class OwnerDashboardTabState extends State<OwnerDashboardTab> {
     setState(() => _isExportingHitachi = true);
     try {
       final bytes = await widget.apiService.exportHitachiJobs();
-      downloadBytes(bytes, 'hitachi-jobs-export.xlsx');
+      await downloadBytes(bytes, 'hitachi-jobs-export.xlsx');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export downloaded')));
     } catch (e) {

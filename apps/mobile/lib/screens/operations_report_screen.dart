@@ -108,7 +108,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
     setState(() => _isExporting = true);
     try {
       final bytes = await widget.apiService.exportOperationsReport(period: _period, date: _anchorDate);
-      downloadBytes(bytes, 'operations-report-$_period.xlsx');
+      await downloadBytes(bytes, 'operations-report-$_period.xlsx');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export downloaded')));
     } catch (e) {
@@ -123,7 +123,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
     setState(() => _isExportingDetail = true);
     try {
       final bytes = await widget.apiService.exportOperationsDetail(period: _period, date: _anchorDate);
-      downloadBytes(bytes, 'operations-detail-$_period.xlsx');
+      await downloadBytes(bytes, 'operations-detail-$_period.xlsx');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export downloaded')));
     } catch (e) {
@@ -138,7 +138,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
     setState(() => _isExportingByTruck = true);
     try {
       final bytes = await widget.apiService.exportTripsByTruckExcel(period: _period, date: _anchorDate);
-      downloadBytes(bytes, 'trips-by-truck-$_period.xlsx');
+      await downloadBytes(bytes, 'trips-by-truck-$_period.xlsx');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export downloaded')));
     } catch (e) {
@@ -153,7 +153,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
     setState(() => _isExportingHitachi = true);
     try {
       final bytes = await widget.apiService.exportHitachiJobs(period: _period, date: _anchorDate);
-      downloadBytes(bytes, 'hitachi-jobs-$_period.xlsx');
+      await downloadBytes(bytes, 'hitachi-jobs-$_period.xlsx');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export downloaded')));
     } catch (e) {
