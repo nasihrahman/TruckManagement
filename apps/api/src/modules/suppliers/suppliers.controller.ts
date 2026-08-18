@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { SuppliersService } from './suppliers.service';
 import { CreateSupplierDto, UpdateSupplierDto } from './dto/supplier.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -26,5 +26,10 @@ export class SuppliersController {
   @Patch(':id')
   async update(@Request() req: any, @Param('id') id: string, @Body() dto: UpdateSupplierDto) {
     return this.suppliersService.update(id, req.user.companyId, dto);
+  }
+
+  @Delete(':id')
+  async remove(@Request() req: any, @Param('id') id: string) {
+    return this.suppliersService.remove(id, req.user.companyId);
   }
 }

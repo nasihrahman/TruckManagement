@@ -5,10 +5,14 @@ import '../widgets/slide_to_act.dart';
 import '../widgets/expenses_list_view.dart';
 
 class TripDetailScreen extends StatefulWidget {
-  const TripDetailScreen({super.key, required this.apiService, required this.trip});
+  const TripDetailScreen({super.key, required this.apiService, required this.trip, this.isOnline = false});
 
   final ApiService apiService;
   final Trip trip;
+  /// Whether the driver is currently on Duty Status Online. A trip can only
+  /// be started (not ended) while Online, so location tracking is running
+  /// for the whole trip rather than picking up partway through.
+  final bool isOnline;
 
   @override
   State<TripDetailScreen> createState() => _TripDetailScreenState();
@@ -94,6 +98,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   Widget build(BuildContext context) {
     final canAct = _trip.status == 'ASSIGNED' || _trip.status == 'IN_TRANSIT';
     final canDelete = _trip.status == 'ASSIGNED';
+    final blockedOffline = _trip.status == 'ASSIGNED' && !widget.isOnline;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -161,11 +166,35 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Center(
-                    child: SlideToAct(
-                      label: _trip.status == 'ASSIGNED' ? 'Slide to Start Trip' : 'Slide to End Trip',
-                      thumbColor: _trip.status == 'ASSIGNED' ? Colors.green : Colors.red,
-                      onAct: _handleTripAction,
-                    ),
+                    child: blockedOffline
+                        ? Container(
+                            width: 300,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(30),
+                              border: Border.all(color: Colors.orange),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.wifi_off, color: Colors.orange, size: 18),
+                                SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    'Go online to start this trip',
+                                    style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : SlideToAct(
+                            label: _trip.status == 'ASSIGNED' ? 'Slide to Start Trip' : 'Slide to End Trip',
+                            thumbColor: _trip.status == 'ASSIGNED' ? Colors.green : Colors.red,
+                            onAct: _handleTripAction,
+                          ),
                   ),
                 ),
               ),

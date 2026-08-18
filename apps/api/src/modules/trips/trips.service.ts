@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import { TripsRepository } from './trips.repository';
 import { Trip, TripStatus, Prisma } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
+import { ReportPeriod, resolvePeriodRange } from '../reports/period.util';
 
 @Injectable()
 export class TripsService {
@@ -155,8 +156,9 @@ export class TripsService {
     return Buffer.from(buffer);
   }
 
-  async exportByTruckToExcel(companyId: string): Promise<Buffer> {
-    const trips = await this.tripsRepository.findByCompanyForTruckExport(companyId);
+  async exportByTruckToExcel(companyId: string, period?: ReportPeriod, dateStr?: string): Promise<Buffer> {
+    const range = period ? resolvePeriodRange(period, dateStr ? new Date(dateStr) : new Date()) : undefined;
+    const trips = await this.tripsRepository.findByCompanyForTruckExport(companyId, range);
 
     const groups = new Map<string, { name: string; trips: typeof trips }>();
     for (const trip of trips) {
@@ -176,6 +178,10 @@ export class TripsService {
       { header: 'Driver', key: 'driver', width: 20 },
       { header: 'Status', key: 'status', width: 14 },
       { header: 'Expenses', key: 'expenseTotal', width: 12 },
+      { header: 'Fuel', key: 'fuelTotal', width: 12 },
+      { header: 'Fine', key: 'fineTotal', width: 12 },
+      { header: 'Other', key: 'otherTotal', width: 12 },
+      { header: 'Expense Reasons', key: 'expenseReasons', width: 32 },
     ];
 
     const usedNames = new Set<string>();
@@ -193,6 +199,15 @@ export class TripsService {
 
       for (const trip of truckTrips) {
         const expenseTotal = trip.expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+        const totalByCategory = (category: string) =>
+          trip.expenses
+            .filter((e) => e.category === category)
+            .reduce((sum, e) => sum + Number(e.amount), 0);
+        const expenseReasons = trip.expenses
+          .filter((e) => e.reason || e.notes)
+          .map((e) => `${e.category}: ${e.reason ?? e.notes}`)
+          .join('; ');
+
         sheet.addRow({
           scheduledAt: trip.scheduledAt ? trip.scheduledAt.toISOString().slice(0, 10) : '',
           material: trip.material?.name ?? '',
@@ -204,6 +219,10 @@ export class TripsService {
             : 'Unassigned',
           status: trip.status,
           expenseTotal,
+          fuelTotal: totalByCategory('FUEL'),
+          fineTotal: totalByCategory('FINE'),
+          otherTotal: totalByCategory('OTHER'),
+          expenseReasons,
         });
       }
     }

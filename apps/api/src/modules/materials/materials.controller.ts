@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { MaterialsService } from './materials.service';
 import { CreateMaterialDto, UpdateMaterialDto } from './dto/material.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -26,5 +26,10 @@ export class MaterialsController {
   @Patch(':id')
   async update(@Request() req: any, @Param('id') id: string, @Body() dto: UpdateMaterialDto) {
     return this.materialsService.update(id, req.user.companyId, dto);
+  }
+
+  @Delete(':id')
+  async remove(@Request() req: any, @Param('id') id: string) {
+    return this.materialsService.remove(id, req.user.companyId);
   }
 }

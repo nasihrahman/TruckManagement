@@ -69,7 +69,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
     final changed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => TripDetailScreen(apiService: widget.apiService, trip: trip),
+        builder: (_) => TripDetailScreen(apiService: widget.apiService, trip: trip, isOnline: _isOnline),
       ),
     );
     if (changed == true) _refreshTrips();
@@ -77,6 +77,12 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
 
   Future<void> _createTrip() async {
     if (_myDriverId == null) return;
+    if (!_isOnline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Go online to create a trip')),
+      );
+      return;
+    }
     final created = await Navigator.push<Trip>(
       context,
       MaterialPageRoute(

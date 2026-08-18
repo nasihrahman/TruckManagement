@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { TrucksRepository } from './trucks.repository';
 import { CreateTruckDto } from './dto/truck.dto';
 import { UpdateTruckDto } from './dto/truck.dto';
-import { Truck } from '@prisma/client';
+import { Truck, Prisma } from '@prisma/client';
 
 @Injectable()
 export class TrucksService {
@@ -31,6 +31,13 @@ export class TrucksService {
 
   async remove(id: string, companyId: string): Promise<Truck> {
     const truck = await this.findOne(id, companyId);
-    return this.trucksRepository.delete(truck.id, companyId);
+    try {
+      return await this.trucksRepository.delete(truck.id, companyId);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        throw new BadRequestException('This truck has maintenance records and cannot be deleted');
+      }
+      throw error;
+    }
   }
 }

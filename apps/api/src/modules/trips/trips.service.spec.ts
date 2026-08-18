@@ -11,6 +11,7 @@ describe('TripsService', () => {
     update: jest.fn(),
     updateStatus: jest.fn(),
     remove: jest.fn(),
+    findByCompanyForTruckExport: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -73,6 +74,27 @@ describe('TripsService', () => {
       repo.findById.mockResolvedValue({ id: 't1', companyId: 'company-1', driverId: 'driver-1', status: 'IN_TRANSIT' });
       await expect(service.remove('t1', driver)).rejects.toThrow();
       expect(repo.remove).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('exportByTruckToExcel', () => {
+    it('exports all-time when no period is given', async () => {
+      repo.findByCompanyForTruckExport.mockResolvedValue([]);
+
+      await service.exportByTruckToExcel('company-1');
+
+      expect(repo.findByCompanyForTruckExport).toHaveBeenCalledWith('company-1', undefined);
+    });
+
+    it('scopes the export to the resolved period range when a period is given', async () => {
+      repo.findByCompanyForTruckExport.mockResolvedValue([]);
+
+      await service.exportByTruckToExcel('company-1', 'weekly', '2026-08-15');
+
+      expect(repo.findByCompanyForTruckExport).toHaveBeenCalledWith('company-1', {
+        start: new Date('2026-08-10T00:00:00.000Z'),
+        end: new Date('2026-08-17T00:00:00.000Z'),
+      });
     });
   });
 });

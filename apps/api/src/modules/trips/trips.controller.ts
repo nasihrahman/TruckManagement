@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Request, Res, UseGuards, NotFoundException } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, Res, UseGuards, NotFoundException } from '@nestjs/common';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -8,6 +8,7 @@ import { TripsService } from './trips.service';
 import { CreateTripDto } from './dto/create-trip.dto';
 import { UpdateTripDto } from './dto/update-trip.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
+import { TruckExportQueryDto } from './dto/truck-export-query.dto';
 
 @Controller('trips')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -45,11 +46,12 @@ export class TripsController {
 
   @Get('export-by-truck.xlsx')
   @Roles(Role.OWNER)
-  async exportByTruckXlsx(@Request() req: any, @Res() res: Response) {
-    const buffer = await this.tripsService.exportByTruckToExcel(req.user.companyId);
+  async exportByTruckXlsx(@Request() req: any, @Query() query: TruckExportQueryDto, @Res() res: Response) {
+    const buffer = await this.tripsService.exportByTruckToExcel(req.user.companyId, query.period, query.date);
+    const suffix = query.period ? `-${query.period}` : '';
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': 'attachment; filename="trips-by-truck-export.xlsx"',
+      'Content-Disposition': `attachment; filename="trips-by-truck-export${suffix}.xlsx"`,
     });
     res.send(buffer);
   }

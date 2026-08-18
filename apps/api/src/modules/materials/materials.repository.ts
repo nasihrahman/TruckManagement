@@ -31,4 +31,10 @@ export class MaterialsRepository {
       data: { name },
     });
   }
+
+  async delete(id: string): Promise<Material> {
+    return this.prisma.material.delete({
+      where: { id },
+    });
+  }
 }

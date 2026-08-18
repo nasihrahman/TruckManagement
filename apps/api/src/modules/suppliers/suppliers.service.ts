@@ -41,4 +41,9 @@ export class SuppliersService {
       throw error;
     }
   }
+
+  async remove(id: string, companyId: string): Promise<Supplier> {
+    const supplier = await this.findOne(id, companyId);
+    return this.suppliersRepository.delete(supplier.id);
+  }
 }

@@ -95,16 +95,19 @@ export class TripsRepository {
     });
   }
 
-  async findByCompanyForTruckExport(companyId: string) {
+  async findByCompanyForTruckExport(companyId: string, range?: { start: Date; end: Date }) {
     return this.prisma.trip.findMany({
-      where: { companyId },
+      where: {
+        companyId,
+        ...(range ? { scheduledAt: { gte: range.start, lt: range.end } } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         driver: { select: { id: true, firstName: true, lastName: true } },
         truck: { select: { id: true, plate: true, brand: true } },
         material: { select: { name: true } },
         supplier: { select: { name: true } },
-        expenses: { select: { amount: true } },
+        expenses: { select: { amount: true, category: true, reason: true, notes: true } },
       },
     });
   }

@@ -64,6 +64,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
   int _selectedIndex = 0;
   bool _isExporting = false;
   bool _isExportingDetail = false;
+  bool _isExportingByTruck = false;
   late Future<Map<String, dynamic>> _reportFuture;
 
   static const _periodLabels = {
@@ -129,6 +130,21 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _isExportingDetail = false);
+    }
+  }
+
+  Future<void> _exportByTruck() async {
+    setState(() => _isExportingByTruck = true);
+    try {
+      final bytes = await widget.apiService.exportTripsByTruckExcel(period: _period, date: _anchorDate);
+      downloadBytes(bytes, 'trips-by-truck-$_period.xlsx');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export downloaded')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _isExportingByTruck = false);
     }
   }
 
@@ -307,6 +323,17 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
                               ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                               : const Icon(Icons.list_alt),
                           label: const Text('Export Full Details (trips + expenses)'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _isExportingByTruck ? null : _exportByTruck,
+                          icon: _isExportingByTruck
+                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.local_shipping_outlined),
+                          label: const Text('Export by Truck (Fuel/Fine/Other)'),
                         ),
                       ),
                     ],

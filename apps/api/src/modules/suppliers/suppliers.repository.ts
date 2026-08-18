@@ -31,4 +31,10 @@ export class SuppliersRepository {
       data: { name },
     });
   }
+
+  async delete(id: string): Promise<Supplier> {
+    return this.prisma.supplier.delete({
+      where: { id },
+    });
+  }
 }

@@ -41,4 +41,9 @@ export class MaterialsService {
       throw error;
     }
   }
+
+  async remove(id: string, companyId: string): Promise<Material> {
+    const material = await this.findOne(id, companyId);
+    return this.materialsRepository.delete(material.id);
+  }
 }

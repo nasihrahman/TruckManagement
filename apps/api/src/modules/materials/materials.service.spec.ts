@@ -12,6 +12,7 @@ describe('MaterialsService', () => {
     findAll: jest.fn(),
     findById: jest.fn(),
     update: jest.fn(),
+    delete: jest.fn(),
   };
 
   const mockMaterial = { id: 'material-1', companyId: 'company-1', name: 'P Sand', createdAt: new Date() };
@@ -64,6 +65,25 @@ describe('MaterialsService', () => {
 
       expect(mockRepository.update).toHaveBeenCalledWith('material-1', 'M Sand');
       expect(result.name).toBe('M Sand');
+    });
+  });
+
+  describe('remove', () => {
+    it('deletes a material after confirming it belongs to the company', async () => {
+      mockRepository.findById.mockResolvedValue(mockMaterial);
+      mockRepository.delete.mockResolvedValue(mockMaterial);
+
+      const result = await service.remove('material-1', 'company-1');
+
+      expect(mockRepository.delete).toHaveBeenCalledWith('material-1');
+      expect(result).toEqual(mockMaterial);
+    });
+
+    it('throws NotFoundException when the material does not belong to the company', async () => {
+      mockRepository.findById.mockResolvedValue(null);
+
+      await expect(service.remove('material-1', 'company-1')).rejects.toThrow(NotFoundException);
+      expect(mockRepository.delete).not.toHaveBeenCalled();
     });
   });
 });

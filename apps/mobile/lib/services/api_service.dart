@@ -246,6 +246,16 @@ class ApiService {
     return CargoMaterial.fromJson(body);
   }
 
+  Future<void> deleteCargoMaterial(String id) async {
+    final response = await _send(
+      (headers) => http.delete(Uri.parse('$baseUrl/materials/$id'), headers: headers),
+    );
+    if (response.statusCode >= 400) {
+      final body = jsonDecode(response.body);
+      throw Exception(body['message'] ?? 'Unable to delete material');
+    }
+  }
+
   Future<List<String>> fetchTripCustomerNames() async {
     final response = await _send(
       (headers) => http.get(Uri.parse('$baseUrl/trips/customer-names'), headers: headers),
@@ -289,10 +299,23 @@ class ApiService {
     return Supplier.fromJson(body);
   }
 
-  Future<Uint8List> exportTripsByTruckExcel() async {
+  Future<void> deleteSupplier(String id) async {
     final response = await _send(
-      (headers) => http.get(Uri.parse('$baseUrl/trips/export-by-truck.xlsx'), headers: headers),
+      (headers) => http.delete(Uri.parse('$baseUrl/suppliers/$id'), headers: headers),
     );
+    if (response.statusCode >= 400) {
+      final body = jsonDecode(response.body);
+      throw Exception(body['message'] ?? 'Unable to delete supplier');
+    }
+  }
+
+  Future<Uint8List> exportTripsByTruckExcel({String? period, DateTime? date}) async {
+    final query = {
+      if (period != null) 'period': period,
+      if (date != null) 'date': date.toIso8601String(),
+    };
+    final uri = Uri.parse('$baseUrl/trips/export-by-truck.xlsx').replace(queryParameters: query.isEmpty ? null : query);
+    final response = await _send((headers) => http.get(uri, headers: headers));
     if (response.statusCode >= 400) {
       throw Exception('Unable to export trips by truck');
     }
@@ -363,6 +386,16 @@ class ApiService {
       throw Exception(body['message'] ?? 'Unable to update truck');
     }
     return Truck.fromJson(body);
+  }
+
+  Future<void> deleteTruck(String id) async {
+    final response = await _send(
+      (headers) => http.delete(Uri.parse('$baseUrl/trucks/$id'), headers: headers),
+    );
+    if (response.statusCode >= 400) {
+      final body = jsonDecode(response.body);
+      throw Exception(body['message'] ?? 'Unable to delete truck');
+    }
   }
 
   Future<Map<String, dynamic>> createDriver({
