@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/trip.dart';
 import '../services/api_service.dart';
+import '../services/background_location_service.dart';
 import '../services/tracking_notification_service.dart';
 import '../widgets/app_brand_title.dart';
 import 'trip_detail_screen.dart';
@@ -52,8 +54,11 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
         _isOnline = profile['isOnline'] == true;
       });
       if (_isOnline) {
-        _startLocationTimer();
-        TrackingNotificationService.instance.showTrackingActive();
+        if (kIsWeb) {
+          _startLocationTimer();
+        } else {
+          await BackgroundLocationService.instance.start();
+        }
       }
     } catch (_) {
       // Non-fatal: Create Trip / duty toggle just stay unavailable until this loads.
@@ -134,13 +139,19 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
           );
         }
         await widget.apiService.goOnline();
-        _startLocationTimer();
-        await TrackingNotificationService.instance.requestPermission();
-        await TrackingNotificationService.instance.showTrackingActive();
+        if (kIsWeb) {
+          _startLocationTimer();
+        } else {
+          // Permission first: on Android 13+ the foreground service's mandatory
+          // notification is suppressed without POST_NOTIFICATIONS, and a
+          // foreground service with no visible notification gets killed.
+          await TrackingNotificationService.instance.requestPermission();
+          await BackgroundLocationService.instance.start();
+        }
       } else {
         _locationTimer?.cancel();
+        if (!kIsWeb) await BackgroundLocationService.instance.stop();
         await widget.apiService.goOffline();
-        await TrackingNotificationService.instance.cancelTrackingActive();
       }
       if (!mounted) return;
       setState(() => _isOnline = value);
@@ -182,6 +193,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
           IconButton(
             onPressed: () async {
               _locationTimer?.cancel();
+              if (!kIsWeb) await BackgroundLocationService.instance.stop();
               await widget.apiService.clearToken();
               if (!mounted) return;
               Navigator.of(context).popUntil((route) => route.isFirst);
