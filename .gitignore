@@ -6,3 +6,5 @@ dist/
 **/.env
 apps/mobile/app.env
 *.log
+CLAUDE.md
+MASTER_BUILD_SPEC.md
