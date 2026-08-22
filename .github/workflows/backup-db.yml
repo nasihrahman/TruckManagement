@@ -9,13 +9,14 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      # pg_dump must be the same version or newer than the server. Confirmed
-      # via actual failed runs: Neon is on server version 18.6, Ubuntu's repo
-      # only offers 16, and PGDG's *unversioned* postgresql-client metapackage
-      # unexpectedly also resolved to 16 (its "default" hadn't moved to 18) —
-      # so this pins the major version explicitly rather than assuming latest.
-      # If pg_dump starts failing with a NEW version-mismatch error after a
-      # future Neon upgrade, bump the "-18" below to match.
+      # pg_dump must be the same version or newer than the server (Neon is on
+      # 18.x). Two traps, both hit for real before this worked:
+      #   1. Ubuntu's repo only ships 16, and PGDG's *unversioned*
+      #      postgresql-client metapackage also resolved to 16.
+      #   2. Installing 18 still isn't enough — the runner already has a v16
+      #      client, and /usr/bin/pg_dump is a Debian wrapper that keeps
+      #      resolving to the older one. The versioned binary must be called
+      #      directly, so PGDUMP below points at the highest installed version.
       - name: Install Postgres client
         run: |
           sudo apt-get update
@@ -24,12 +25,15 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
           sudo apt-get install -y postgresql-client-18
+          PGDUMP=$(ls -d /usr/lib/postgresql/*/bin/pg_dump | sort -V | tail -1)
+          echo "PGDUMP=$PGDUMP" >> "$GITHUB_ENV"
+          "$PGDUMP" --version
 
       - name: Dump database
         run: |
           set -euo pipefail
           FILENAME="backup-$(date +%Y-%m-%d).sql.gz"
-          pg_dump "$DATABASE_URL" --no-owner --no-privileges | gzip > "$FILENAME"
+          "$PGDUMP" "$DATABASE_URL" --no-owner --no-privileges | gzip > "$FILENAME"
           echo "FILENAME=$FILENAME" >> "$GITHUB_ENV"
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
