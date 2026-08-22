@@ -9,10 +9,11 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      # Ubuntu's default postgresql-client is often too old to support Neon's
-      # `channel_binding=require` connection parameter, which fails the dump
-      # with an obscure connection error — installing from the official PGDG
-      # repo guarantees a client new enough to match Neon's server version.
+      # pg_dump must be the same version or newer than the server (Neon runs
+      # whatever Postgres major version is current — 18 as of this writing).
+      # Ubuntu's own repo lags behind, and pinning a specific version here
+      # (we tried 17) just goes stale on Neon's next upgrade — the unversioned
+      # `postgresql-client` metapackage from PGDG always resolves to latest.
       - name: Install Postgres client
         run: |
           sudo apt-get update
@@ -20,7 +21,7 @@ jobs:
           curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/pgdg.gpg
           echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
-          sudo apt-get install -y postgresql-client-17
+          sudo apt-get install -y postgresql-client
 
       - name: Dump database
         run: |
