@@ -1,0 +1,32 @@
+name: Keepalive
+
+# GitHub disables scheduled workflows in public repos after 60 days with no
+# repository activity — and a workflow merely *running* doesn't count as
+# activity, only a real push does. This makes one small commit a month so
+# the backup and CI workflows never lapse, even during quiet stretches.
+on:
+  schedule:
+    - cron: '0 3 1 * *' # 1st of every month, 03:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Touch keepalive marker
+        run: |
+          mkdir -p .github
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .github/.keepalive
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/.keepalive
+          git diff --cached --quiet || git commit -m "keepalive: prevent scheduled workflows from auto-disabling"
+          git push
