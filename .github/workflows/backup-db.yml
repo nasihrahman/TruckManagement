@@ -9,11 +9,13 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      # pg_dump must be the same version or newer than the server (Neon runs
-      # whatever Postgres major version is current — 18 as of this writing).
-      # Ubuntu's own repo lags behind, and pinning a specific version here
-      # (we tried 17) just goes stale on Neon's next upgrade — the unversioned
-      # `postgresql-client` metapackage from PGDG always resolves to latest.
+      # pg_dump must be the same version or newer than the server. Confirmed
+      # via actual failed runs: Neon is on server version 18.6, Ubuntu's repo
+      # only offers 16, and PGDG's *unversioned* postgresql-client metapackage
+      # unexpectedly also resolved to 16 (its "default" hadn't moved to 18) —
+      # so this pins the major version explicitly rather than assuming latest.
+      # If pg_dump starts failing with a NEW version-mismatch error after a
+      # future Neon upgrade, bump the "-18" below to match.
       - name: Install Postgres client
         run: |
           sudo apt-get update
@@ -21,7 +23,7 @@ jobs:
           curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/pgdg.gpg
           echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-client-18
 
       - name: Dump database
         run: |
