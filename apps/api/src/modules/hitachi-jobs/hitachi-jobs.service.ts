@@ -50,11 +50,16 @@ export class HitachiJobsService {
     });
   }
 
-  async findByCompany(companyId: string, userId?: string, role?: string) {
+  async findByCompany(
+    companyId: string,
+    userId?: string,
+    role?: string,
+    page?: { limit?: number; offset?: number },
+  ) {
     if (role === 'DRIVER' && userId) {
-      return this.hitachiJobsRepository.findByCompanyAndDriver(companyId, userId);
+      return this.hitachiJobsRepository.findByCompanyAndDriver(companyId, userId, page);
     }
-    return this.hitachiJobsRepository.findByCompany(companyId);
+    return this.hitachiJobsRepository.findByCompany(companyId, page);
   }
 
   async findOne(id: string, user: RequestUser): Promise<HitachiJob> {

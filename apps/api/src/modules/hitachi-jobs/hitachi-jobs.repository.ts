@@ -19,18 +19,22 @@ export class HitachiJobsRepository {
     return this.prisma.hitachiJob.findUnique({ where: { id }, include: includeRelations });
   }
 
-  async findByCompany(companyId: string) {
+  async findByCompany(companyId: string, page?: { limit?: number; offset?: number }) {
     return this.prisma.hitachiJob.findMany({
       where: { companyId },
       orderBy: { date: 'desc' },
+      ...(page?.limit !== undefined ? { take: page.limit } : {}),
+      ...(page?.offset ? { skip: page.offset } : {}),
       include: includeRelations,
     });
   }
 
-  async findByCompanyAndDriver(companyId: string, driverId: string) {
+  async findByCompanyAndDriver(companyId: string, driverId: string, page?: { limit?: number; offset?: number }) {
     return this.prisma.hitachiJob.findMany({
       where: { companyId, driverId },
       orderBy: { date: 'desc' },
+      ...(page?.limit !== undefined ? { take: page.limit } : {}),
+      ...(page?.offset ? { skip: page.offset } : {}),
       include: includeRelations,
     });
   }

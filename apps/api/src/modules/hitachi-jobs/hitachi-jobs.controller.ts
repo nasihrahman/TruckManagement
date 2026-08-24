@@ -7,6 +7,7 @@ import { Role } from '@prisma/client';
 import { HitachiJobsService } from './hitachi-jobs.service';
 import { CreateHitachiJobDto, UpdateHitachiJobDto } from './dto/hitachi-job.dto';
 import { HitachiJobExportQueryDto } from './dto/hitachi-job-export-query.dto';
+import { ListHitachiJobsQueryDto } from './dto/list-hitachi-jobs-query.dto';
 
 @Controller('hitachi-jobs')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -20,8 +21,11 @@ export class HitachiJobsController {
   }
 
   @Get()
-  async list(@Request() req: any) {
-    return this.hitachiJobsService.findByCompany(req.user.companyId, req.user.userId, req.user.role);
+  async list(@Request() req: any, @Query() query: ListHitachiJobsQueryDto) {
+    return this.hitachiJobsService.findByCompany(req.user.companyId, req.user.userId, req.user.role, {
+      limit: query.limit,
+      offset: query.offset,
+    });
   }
 
   @Get('export.xlsx')
