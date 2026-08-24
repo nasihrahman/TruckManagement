@@ -67,14 +67,22 @@ export class TripsRepository {
     return this.prisma.trip.findFirst({ where: { driverId, status: 'IN_TRANSIT' } });
   }
 
+  /// Raw SQL rather than Prisma's `distinct`, which does NOT compile to SQL
+  /// DISTINCT — it fetches every matching row and de-duplicates them in
+  /// JavaScript. That meant loading every customerName ever recorded just to
+  /// return the handful of unique ones. Postgres does the dedupe here, and the
+  /// LIMIT caps an autocomplete list that no one scrolls to the end of anyway.
   async findDistinctCustomerNames(companyId: string): Promise<string[]> {
-    const rows = await this.prisma.trip.findMany({
-      where: { companyId, customerName: { not: null } },
-      select: { customerName: true },
-      distinct: ['customerName'],
-      orderBy: { customerName: 'asc' },
-    });
-    return rows.map((r) => r.customerName!).filter((name) => name.trim().length > 0);
+    const rows = await this.prisma.$queryRaw<{ customerName: string }[]>`
+      SELECT DISTINCT "customerName"
+      FROM "Trip"
+      WHERE "companyId" = ${companyId}
+        AND "customerName" IS NOT NULL
+        AND btrim("customerName") <> ''
+      ORDER BY "customerName" ASC
+      LIMIT 200
+    `;
+    return rows.map((r) => r.customerName);
   }
 
   async remove(id: string): Promise<void> {
