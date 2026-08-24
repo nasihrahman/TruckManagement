@@ -164,6 +164,8 @@ export class DriversRepository {
     });
   }
 
+  /// Upsert, not insert: one row per driver holding their current position.
+  /// The 60s loop overwrites it rather than accumulating history.
   async createLocationPing(data: {
     driverId: string;
     companyId: string;
@@ -171,7 +173,12 @@ export class DriversRepository {
     latitude: number;
     longitude: number;
   }) {
-    return this.prisma.locationPing.create({ data });
+    const { driverId, ...rest } = data;
+    return this.prisma.locationPing.upsert({
+      where: { driverId },
+      create: { driverId, ...rest },
+      update: rest,
+    });
   }
 
   async getOnlineShifts(companyId: string) {
@@ -181,10 +188,9 @@ export class DriversRepository {
     });
   }
 
+  /// findUnique, not findFirst+orderBy: there is only ever one row per driver
+  /// now, so this is a primary-key style lookup with no scan and no sort.
   async getLatestPing(driverId: string) {
-    return this.prisma.locationPing.findFirst({
-      where: { driverId },
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.prisma.locationPing.findUnique({ where: { driverId } });
   }
 }

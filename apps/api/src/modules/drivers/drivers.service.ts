@@ -161,7 +161,7 @@ export class DriversService {
           name: [shift.driver.firstName, shift.driver.lastName].filter(Boolean).join(' ') || 'Driver',
           onlineSince: shift.startedAt,
           lastLocation: latestPing
-            ? { latitude: latestPing.latitude, longitude: latestPing.longitude, at: latestPing.createdAt, tripId: latestPing.tripId }
+            ? { latitude: latestPing.latitude, longitude: latestPing.longitude, at: latestPing.updatedAt, tripId: latestPing.tripId }
             : null,
         };
       }),

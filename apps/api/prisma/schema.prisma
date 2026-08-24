@@ -261,10 +261,16 @@ model DriverShift {
   date      DateTime @default(now())
 }
 
+/// One row per driver holding their CURRENT location, not a history of pings.
+/// Nothing in the app ever read older pings — only the newest — so the 60s
+/// ping loop now updates this row in place instead of inserting ~600 rows per
+/// driver per day. Keeps the table at one row per driver permanently.
+/// If route replay or distance-travelled is ever needed, that wants a separate
+/// history table starting from that day; this one cannot reconstruct the past.
 model LocationPing {
   id        String   @id @default(cuid())
   driver    User     @relation(fields: [driverId], references: [id])
-  driverId  String
+  driverId  String   @unique
   company   Company  @relation(fields: [companyId], references: [id])
   companyId String
   trip      Trip?    @relation(fields: [tripId], references: [id])
@@ -272,4 +278,7 @@ model LocationPing {
   latitude  Float
   longitude Float
   createdAt DateTime @default(now())
+  /// When this driver was last heard from — this is the timestamp the Owner
+  /// dashboard's "Xm ago" is derived from, not createdAt.
+  updatedAt DateTime @updatedAt
 }
