@@ -9,6 +9,7 @@ import { CreateTripDto } from './dto/create-trip.dto';
 import { UpdateTripDto } from './dto/update-trip.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { TruckExportQueryDto } from './dto/truck-export-query.dto';
+import { ListTripsQueryDto } from './dto/list-trips-query.dto';
 
 @Controller('trips')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -22,9 +23,12 @@ export class TripsController {
   }
 
   @Get()
-  async list(@Request() req: any) {
+  async list(@Request() req: any, @Query() query: ListTripsQueryDto) {
     const companyId = req.user.companyId;
-    return this.tripsService.findByCompany(companyId, req.user.userId, req.user.role);
+    return this.tripsService.findByCompany(companyId, req.user.userId, req.user.role, {
+      limit: query.limit,
+      offset: query.offset,
+    });
   }
 
   @Get('customer-names')

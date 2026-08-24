@@ -14,10 +14,12 @@ export class TripsRepository {
     return this.prisma.trip.findUnique({ where: { id } });
   }
 
-  async findByCompany(companyId: string) {
+  async findByCompany(companyId: string, page?: { limit?: number; offset?: number }) {
     return this.prisma.trip.findMany({
       where: { companyId },
       orderBy: { createdAt: 'desc' },
+      ...(page?.limit !== undefined ? { take: page.limit } : {}),
+      ...(page?.offset ? { skip: page.offset } : {}),
       include: {
         expenses: { select: { amount: true, category: true, createdAt: true } },
         material: { select: { name: true } },
@@ -44,13 +46,15 @@ export class TripsRepository {
     return this.prisma.trip.update({ where: { id }, data });
   }
 
-  async findByCompanyAndDriver(companyId: string, driverId: string) {
+  async findByCompanyAndDriver(companyId: string, driverId: string, page?: { limit?: number; offset?: number }) {
     return this.prisma.trip.findMany({
       where: {
         companyId,
         driverId,
       },
       orderBy: { createdAt: 'desc' },
+      ...(page?.limit !== undefined ? { take: page.limit } : {}),
+      ...(page?.offset ? { skip: page.offset } : {}),
       include: {
         expenses: { select: { amount: true, category: true, createdAt: true } },
         material: { select: { name: true } },

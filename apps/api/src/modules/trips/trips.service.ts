@@ -16,11 +16,16 @@ export class TripsService {
     return this.tripsRepository.create({ ...payload, driverId, companyId: user.companyId });
   }
 
-  async findByCompany(companyId: string, userId?: string, role?: string) {
+  async findByCompany(
+    companyId: string,
+    userId?: string,
+    role?: string,
+    page?: { limit?: number; offset?: number },
+  ) {
     if (role === 'DRIVER' && userId) {
-      return this.tripsRepository.findByCompanyAndDriver(companyId, userId);
+      return this.tripsRepository.findByCompanyAndDriver(companyId, userId, page);
     }
-    return this.tripsRepository.findByCompany(companyId);
+    return this.tripsRepository.findByCompany(companyId, page);
   }
 
   async findDistinctCustomerNames(companyId: string): Promise<string[]> {
