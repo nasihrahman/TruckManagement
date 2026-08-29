@@ -6,6 +6,7 @@ import '../models/trip.dart';
 import '../services/api_service.dart';
 import '../services/background_location_service.dart';
 import '../services/tracking_notification_service.dart';
+import '../widgets/confirm_logout.dart';
 import '../widgets/app_brand_title.dart';
 import 'trip_detail_screen.dart';
 import 'trip_form_screen.dart';
@@ -220,6 +221,8 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
           ),
           IconButton(
             onPressed: () async {
+              if (!await confirmLogout(context)) return;
+              if (!mounted) return;
               _locationTimer?.cancel();
               if (!kIsWeb) await BackgroundLocationService.instance.stop();
               await widget.apiService.clearToken();

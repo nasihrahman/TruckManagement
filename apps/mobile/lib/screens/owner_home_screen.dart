@@ -10,6 +10,7 @@ import 'truck_form_screen.dart';
 import 'materials_screen.dart';
 import 'suppliers_screen.dart';
 import 'hitachi_jobs_screen.dart';
+import '../widgets/confirm_logout.dart';
 
 class OwnerHomeScreen extends StatefulWidget {
   const OwnerHomeScreen({super.key, required this.apiService});
@@ -25,6 +26,8 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
   final _tripsKey = GlobalKey<TripsScreenState>();
 
   Future<void> _logout() async {
+    if (!await confirmLogout(context)) return;
+    if (!mounted) return;
     await widget.apiService.clearToken();
     if (!mounted) return;
     Navigator.of(context).popUntil((route) => route.isFirst);

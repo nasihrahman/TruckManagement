@@ -14,10 +14,27 @@ class HitachiJobsScreen extends StatefulWidget {
 class _HitachiJobsScreenState extends State<HitachiJobsScreen> {
   late Future<List<HitachiJob>> _jobsFuture;
 
+  /// null = "All drivers". Filtered client-side from the loaded list rather
+  /// than refetching, matching how the trips screen filters.
+  String? _driverFilterId;
+
   @override
   void initState() {
     super.initState();
     _refresh();
+  }
+
+  /// Driver options are derived from the jobs themselves, so the dropdown only
+  /// ever offers people who actually have entries — no empty result states.
+  List<MapEntry<String, String>> _driverOptions(List<HitachiJob> jobs) {
+    final byId = <String, String>{};
+    for (final job in jobs) {
+      if (job.driverId.isEmpty) continue;
+      byId.putIfAbsent(job.driverId, () => job.driverName ?? 'Driver');
+    }
+    final entries = byId.entries.toList()
+      ..sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
+    return entries;
   }
 
   void _refresh() {
@@ -90,36 +107,93 @@ class _HitachiJobsScreenState extends State<HitachiJobsScreen> {
           if (snapshot.hasError) {
             return Center(child: Text(snapshot.error.toString()));
           }
-          final jobs = snapshot.data ?? [];
-          if (jobs.isEmpty) {
+          final allJobs = snapshot.data ?? [];
+          if (allJobs.isEmpty) {
             return const Center(child: Text('No Hitachi jobs logged yet'));
           }
-          return ListView.builder(
-            itemCount: jobs.length,
-            itemBuilder: (context, index) {
-              final job = jobs[index];
-              final title = [job.customerName, job.place]
-                  .where((s) => s != null && s.trim().isNotEmpty)
-                  .join(' · ');
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: ListTile(
-                  title: Text(title.isEmpty ? 'Hitachi Job' : title),
-                  subtitle: Text(
-                    '${_formatDate(job.date)}'
-                    '${job.truckName != null ? ' · ${job.truckName}' : ''}'
-                    '${job.totalHours != null ? ' · ${job.totalHours} hrs' : ''}'
-                    ' · Bal (J): ₹${job.balanceJ.toStringAsFixed(0)}',
+
+          final options = _driverOptions(allJobs);
+          // Guard against a stale selection after a refresh drops that driver.
+          final selected = options.any((o) => o.key == _driverFilterId) ? _driverFilterId : null;
+          final jobs = selected == null
+              ? allJobs
+              : allJobs.where((j) => j.driverId == selected).toList();
+
+          return Column(
+            children: [
+              if (options.length > 1)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                  child: DropdownButtonFormField<String?>(
+                    initialValue: selected,
+                    isDense: true,
+                    decoration: InputDecoration(
+                      labelText: 'Logged by',
+                      prefixIcon: const Icon(Icons.person_outline),
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(value: null, child: Text('All drivers')),
+                      ...options.map((o) => DropdownMenuItem<String?>(value: o.key, child: Text(o.value))),
+                    ],
+                    onChanged: (val) => setState(() => _driverFilterId = val),
                   ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    tooltip: 'Delete',
-                    onPressed: () => _deleteJob(job),
-                  ),
-                  onTap: () => _editJob(job),
                 ),
-              );
-            },
+              if (jobs.isEmpty)
+                const Expanded(child: Center(child: Text('No jobs for this driver')))
+              else
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: jobs.length,
+                    itemBuilder: (context, index) {
+                      final job = jobs[index];
+                      final title = [job.customerName, job.place]
+                          .where((s) => s != null && s.trim().isNotEmpty)
+                          .join(' · ');
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        child: ListTile(
+                          title: Text(title.isEmpty ? 'Hitachi Job' : title),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_formatDate(job.date)}'
+                                '${job.truckName != null ? ' · ${job.truckName}' : ''}'
+                                '${job.totalHours != null ? ' · ${job.totalHours} hrs' : ''}'
+                                ' · Bal (J): ₹${job.balanceJ.toStringAsFixed(0)}',
+                              ),
+                              const SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Icon(Icons.person_outline,
+                                      size: 13, color: Theme.of(context).hintColor),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Logged by ${job.driverName ?? 'Unknown'}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Theme.of(context).hintColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          isThreeLine: true,
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            tooltip: 'Delete',
+                            onPressed: () => _deleteJob(job),
+                          ),
+                          onTap: () => _editJob(job),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
           );
         },
       ),

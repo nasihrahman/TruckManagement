@@ -28,6 +28,8 @@ String hitachiPayerLabel(HitachiPayer payer) => payer == HitachiPayer.m ? 'Muthu
 class HitachiJob {
   final String id;
   final String driverId;
+  /// Who logged this entry — the API already includes the driver relation.
+  final String? driverName;
   final String? truckId;
   final String? truckName;
   final DateTime date;
@@ -50,6 +52,7 @@ class HitachiJob {
   HitachiJob({
     required this.id,
     required this.driverId,
+    this.driverName,
     this.truckId,
     this.truckName,
     required this.date,
@@ -91,6 +94,14 @@ class HitachiJob {
     return HitachiJob(
       id: json['id']?.toString() ?? '',
       driverId: json['driverId']?.toString() ?? '',
+      driverName: () {
+        final d = json['driver'] as Map<String, dynamic>?;
+        if (d == null) return null;
+        final name = [d['firstName'], d['lastName']]
+            .where((p) => p != null && p.toString().trim().isNotEmpty)
+            .join(' ');
+        return name.isEmpty ? null : name;
+      }(),
       truckId: json['truckId']?.toString(),
       truckName: (json['truck'] as Map<String, dynamic>?)?['plate']?.toString(),
       date: DateTime.tryParse(json['date']?.toString() ?? '') ?? DateTime.now(),
