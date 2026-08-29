@@ -24,6 +24,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
   String? _myDriverId;
   bool _isOnline = false;
   bool _isTogglingOnline = false;
+  bool _isLoadingProfile = true;
   Timer? _locationTimer;
   final _searchController = TextEditingController();
   String _statusFilter = 'ALL';
@@ -45,13 +46,19 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
     super.dispose();
   }
 
-  Future<void> _loadProfile() async {
+  /// Retries on failure because the API sleeps when idle and its first request
+  /// can be slow or fail outright. Without a retry, one failed call left
+  /// _myDriverId null forever, which hid the Create Trip button until the app
+  /// was force-restarted — the refresh button doesn't reload the profile.
+  Future<void> _loadProfile({int attempt = 0}) async {
+    if (mounted) setState(() => _isLoadingProfile = true);
     try {
       final profile = await widget.apiService.fetchMyDriverProfile();
       if (!mounted) return;
       setState(() {
         _myDriverId = profile['id']?.toString();
         _isOnline = profile['isOnline'] == true;
+        _isLoadingProfile = false;
       });
       if (_isOnline) {
         if (kIsWeb) {
@@ -61,7 +68,14 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
         }
       }
     } catch (_) {
-      // Non-fatal: Create Trip / duty toggle just stay unavailable until this loads.
+      if (attempt < 2) {
+        await Future.delayed(Duration(seconds: 3 * (attempt + 1)));
+        if (!mounted) return;
+        return _loadProfile(attempt: attempt + 1);
+      }
+      // Out of retries — leave the button enabled so tapping it can try again,
+      // rather than silently disabling the screen's main action.
+      if (mounted) setState(() => _isLoadingProfile = false);
     }
   }
 
@@ -82,7 +96,18 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
   }
 
   Future<void> _createTrip() async {
-    if (_myDriverId == null) return;
+    // The profile may have failed to load (usually the API waking from idle).
+    // Retry on demand instead of leaving a button that does nothing when tapped.
+    if (_myDriverId == null) {
+      await _loadProfile();
+      if (!mounted) return;
+      if (_myDriverId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not load your profile. Check your connection and try again.')),
+        );
+        return;
+      }
+    }
     if (!_isOnline) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Go online to create a trip')),
@@ -187,7 +212,10 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
             icon: const Icon(Icons.construction),
           ),
           IconButton(
-            onPressed: _refreshTrips,
+            onPressed: () {
+              _refreshTrips();
+              _loadProfile(); // also recover the profile, not just the trip list
+            },
             icon: const Icon(Icons.refresh),
           ),
           IconButton(
@@ -321,13 +349,19 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
           ),
         ],
       ),
-      floatingActionButton: _myDriverId == null
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: _createTrip,
-              icon: const Icon(Icons.add),
-              label: const Text('Create Trip'),
-            ),
+      // Always rendered: hiding it on a failed profile load made the screen's
+      // main action vanish with no way back short of restarting the app.
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _isLoadingProfile ? null : _createTrip,
+        icon: _isLoadingProfile
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+            : const Icon(Icons.add),
+        label: const Text('Create Trip'),
+      ),
     );
   }
 }
