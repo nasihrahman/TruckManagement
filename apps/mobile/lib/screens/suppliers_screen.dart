@@ -11,18 +11,20 @@ class SuppliersScreen extends StatefulWidget {
 }
 
 class _SuppliersScreenState extends State<SuppliersScreen> {
-  late Future<List<Supplier>> _suppliersFuture;
+  late Future<void> _loadFuture;
+  List<Supplier> _suppliers = [];
+  bool _isReordering = false;
 
   @override
   void initState() {
     super.initState();
-    _refresh();
+    _loadFuture = _refresh();
   }
 
-  void _refresh() {
-    setState(() {
-      _suppliersFuture = widget.apiService.fetchSuppliers();
-    });
+  Future<void> _refresh() async {
+    final suppliers = await widget.apiService.fetchSuppliers();
+    if (!mounted) return;
+    setState(() => _suppliers = suppliers);
   }
 
   Future<void> _addSupplier() async {
@@ -49,7 +51,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
 
     try {
       await widget.apiService.createSupplier(name);
-      _refresh();
+      await _refresh();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
@@ -78,10 +80,30 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
 
     try {
       await widget.apiService.deleteSupplier(supplier.id);
-      _refresh();
+      await _refresh();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  Future<void> _handleReorder(int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex -= 1;
+    final reordered = List<Supplier>.from(_suppliers);
+    final moved = reordered.removeAt(oldIndex);
+    reordered.insert(newIndex, moved);
+    setState(() {
+      _suppliers = reordered;
+      _isReordering = true;
+    });
+    try {
+      await widget.apiService.reorderSuppliers(reordered.map((s) => s.id).toList());
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      await _refresh();
+    } finally {
+      if (mounted) setState(() => _isReordering = false);
     }
   }
 
@@ -94,36 +116,56 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
         ],
       ),
-      body: FutureBuilder<List<Supplier>>(
-        future: _suppliersFuture,
+      body: FutureBuilder<void>(
+        future: _loadFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.connectionState == ConnectionState.waiting && _suppliers.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snapshot.hasError) {
+          if (snapshot.hasError && _suppliers.isEmpty) {
             return Center(child: Text(snapshot.error.toString()));
           }
-          final suppliers = snapshot.data ?? [];
-          if (suppliers.isEmpty) {
+          if (_suppliers.isEmpty) {
             return const Center(child: Text('No suppliers yet'));
           }
-          return ListView.builder(
-            itemCount: suppliers.length,
-            itemBuilder: (context, index) {
-              final supplier = suppliers[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.local_shipping_outlined)),
-                  title: Text(supplier.name),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    tooltip: 'Delete',
-                    onPressed: () => _deleteSupplier(supplier),
+          return Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Drag to reorder — this is the order shown in the Trip Form dropdown.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ),
-              );
-            },
+              ),
+              Expanded(
+                child: AbsorbPointer(
+                  absorbing: _isReordering,
+                  child: ReorderableListView.builder(
+                    itemCount: _suppliers.length,
+                    onReorder: _handleReorder,
+                    itemBuilder: (context, index) {
+                      final supplier = _suppliers[index];
+                      return Card(
+                        key: ValueKey(supplier.id),
+                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        child: ListTile(
+                          leading: const Icon(Icons.drag_handle),
+                          title: Text(supplier.name),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            tooltip: 'Delete',
+                            onPressed: () => _deleteSupplier(supplier),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),

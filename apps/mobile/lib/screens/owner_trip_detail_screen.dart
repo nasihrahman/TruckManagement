@@ -164,7 +164,10 @@ class _OwnerTripDetailScreenState extends State<OwnerTripDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final canOverrideStatus = _trip.status == 'IN_TRANSIT';
+    // ASSIGNED counts too, not just IN_TRANSIT — the driver's "slide to
+    // start" step was removed, so trips now go straight from ASSIGNED to
+    // DELIVERED/FAILED and IN_TRANSIT is no longer reachable in practice.
+    final canOverrideStatus = _trip.status == 'ASSIGNED' || _trip.status == 'IN_TRANSIT';
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {

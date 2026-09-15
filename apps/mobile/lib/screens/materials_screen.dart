@@ -11,18 +11,20 @@ class MaterialsScreen extends StatefulWidget {
 }
 
 class _MaterialsScreenState extends State<MaterialsScreen> {
-  late Future<List<CargoMaterial>> _materialsFuture;
+  late Future<void> _loadFuture;
+  List<CargoMaterial> _materials = [];
+  bool _isReordering = false;
 
   @override
   void initState() {
     super.initState();
-    _refresh();
+    _loadFuture = _refresh();
   }
 
-  void _refresh() {
-    setState(() {
-      _materialsFuture = widget.apiService.fetchCargoMaterials();
-    });
+  Future<void> _refresh() async {
+    final materials = await widget.apiService.fetchCargoMaterials();
+    if (!mounted) return;
+    setState(() => _materials = materials);
   }
 
   Future<void> _addMaterial() async {
@@ -49,7 +51,7 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
 
     try {
       await widget.apiService.createCargoMaterial(name);
-      _refresh();
+      await _refresh();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
@@ -78,10 +80,33 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
 
     try {
       await widget.apiService.deleteCargoMaterial(material.id);
-      _refresh();
+      await _refresh();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  /// Reorders optimistically (the drag already shows the new order), then
+  /// persists it — on failure, re-fetches to snap back to the real order
+  /// rather than leaving the UI showing something the server rejected.
+  Future<void> _handleReorder(int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex -= 1;
+    final reordered = List<CargoMaterial>.from(_materials);
+    final moved = reordered.removeAt(oldIndex);
+    reordered.insert(newIndex, moved);
+    setState(() {
+      _materials = reordered;
+      _isReordering = true;
+    });
+    try {
+      await widget.apiService.reorderMaterials(reordered.map((m) => m.id).toList());
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      await _refresh();
+    } finally {
+      if (mounted) setState(() => _isReordering = false);
     }
   }
 
@@ -94,36 +119,56 @@ class _MaterialsScreenState extends State<MaterialsScreen> {
           IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
         ],
       ),
-      body: FutureBuilder<List<CargoMaterial>>(
-        future: _materialsFuture,
+      body: FutureBuilder<void>(
+        future: _loadFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.connectionState == ConnectionState.waiting && _materials.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snapshot.hasError) {
+          if (snapshot.hasError && _materials.isEmpty) {
             return Center(child: Text(snapshot.error.toString()));
           }
-          final materials = snapshot.data ?? [];
-          if (materials.isEmpty) {
+          if (_materials.isEmpty) {
             return const Center(child: Text('No materials yet'));
           }
-          return ListView.builder(
-            itemCount: materials.length,
-            itemBuilder: (context, index) {
-              final material = materials[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.inventory_2_outlined)),
-                  title: Text(material.name),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    tooltip: 'Delete',
-                    onPressed: () => _deleteMaterial(material),
+          return Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Drag to reorder — this is the order shown in the Trip Form dropdown.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ),
-              );
-            },
+              ),
+              Expanded(
+                child: AbsorbPointer(
+                  absorbing: _isReordering,
+                  child: ReorderableListView.builder(
+                    itemCount: _materials.length,
+                    onReorder: _handleReorder,
+                    itemBuilder: (context, index) {
+                      final material = _materials[index];
+                      return Card(
+                        key: ValueKey(material.id),
+                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        child: ListTile(
+                          leading: const Icon(Icons.drag_handle),
+                          title: Text(material.name),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            tooltip: 'Delete',
+                            onPressed: () => _deleteMaterial(material),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),

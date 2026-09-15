@@ -7,7 +7,13 @@ import '../models/supplier.dart';
 import '../services/api_service.dart';
 
 class TripFormScreen extends StatefulWidget {
-  const TripFormScreen({super.key, required this.apiService, this.existing, this.selfAssignDriverId});
+  const TripFormScreen({
+    super.key,
+    required this.apiService,
+    this.existing,
+    this.selfAssignDriverId,
+    this.isOwner = true,
+  });
 
   final ApiService apiService;
   /// null = create mode, non-null = edit mode (pre-filled, PATCHes on submit).
@@ -15,14 +21,25 @@ class TripFormScreen extends StatefulWidget {
   /// When set (a Driver creating their own trip), the driver dropdown is hidden
   /// and the trip is always assigned to this id.
   final String? selfAssignDriverId;
+  /// Controls whether the "+ Add" Material/Supplier creation buttons show —
+  /// that stays Owner-only regardless of who can edit the trip itself.
+  /// Defaults true so every existing (Owner) call site is unaffected;
+  /// callers on behalf of a Driver must pass false explicitly.
+  final bool isOwner;
 
   @override
   State<TripFormScreen> createState() => _TripFormScreenState();
 }
 
+/// Sentinel dropdown value for "Other (type manually)" — never a real id,
+/// so it can't collide with an actual Material/Supplier id from the server.
+const _otherValue = '__other__';
+
 class _TripFormScreenState extends State<TripFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _qtyCfController;
+  late final TextEditingController _materialOtherController;
+  late final TextEditingController _supplierOtherController;
   String? _selectedDriverId;
   String? _selectedTruckId;
   String? _selectedMaterialId;
@@ -46,8 +63,13 @@ class _TripFormScreenState extends State<TripFormScreen> {
     _customerName = widget.existing?.customerName ?? '';
     _selectedDriverId = widget.selfAssignDriverId ?? widget.existing?.driverId;
     _selectedTruckId = widget.existing?.truckId;
-    _selectedMaterialId = widget.existing?.materialId;
-    _selectedSupplierId = widget.existing?.supplierId;
+    // An existing trip logged with "Other" has materialOther/supplierOther
+    // set and no materialId/supplierId — select the sentinel so the form
+    // reopens showing the free-text field, not an empty dropdown.
+    _selectedMaterialId = widget.existing?.materialOther != null ? _otherValue : widget.existing?.materialId;
+    _selectedSupplierId = widget.existing?.supplierOther != null ? _otherValue : widget.existing?.supplierId;
+    _materialOtherController = TextEditingController(text: widget.existing?.materialOther ?? '');
+    _supplierOtherController = TextEditingController(text: widget.existing?.supplierOther ?? '');
     _deliveryDate = widget.existing?.scheduledAt;
     _loadResources();
   }
@@ -55,6 +77,8 @@ class _TripFormScreenState extends State<TripFormScreen> {
   @override
   void dispose() {
     _qtyCfController.dispose();
+    _materialOtherController.dispose();
+    _supplierOtherController.dispose();
     super.dispose();
   }
 
@@ -191,6 +215,13 @@ class _TripFormScreenState extends State<TripFormScreen> {
     setState(() => _isLoading = true);
     try {
       final qtyCf = double.tryParse(_qtyCfController.text.trim());
+      final isMaterialOther = _selectedMaterialId == _otherValue;
+      final isSupplierOther = _selectedSupplierId == _otherValue;
+      final materialId = isMaterialOther ? null : _selectedMaterialId;
+      final materialOther = isMaterialOther ? _materialOtherController.text.trim() : null;
+      final supplierId = isSupplierOther ? null : _selectedSupplierId;
+      final supplierOther = isSupplierOther ? _supplierOtherController.text.trim() : null;
+
       final Trip savedTrip;
       if (_isEditing) {
         savedTrip = await widget.apiService.updateTrip(
@@ -198,8 +229,10 @@ class _TripFormScreenState extends State<TripFormScreen> {
           driverId: _selectedDriverId,
           truckId: _selectedTruckId,
           scheduledAt: _deliveryDate,
-          materialId: _selectedMaterialId,
-          supplierId: _selectedSupplierId,
+          materialId: materialId,
+          supplierId: supplierId,
+          materialOther: materialOther,
+          supplierOther: supplierOther,
           qtyCf: qtyCf,
           customerName: _customerName.trim(),
         );
@@ -208,8 +241,10 @@ class _TripFormScreenState extends State<TripFormScreen> {
           driverId: _selectedDriverId,
           truckId: _selectedTruckId,
           scheduledAt: _deliveryDate,
-          materialId: _selectedMaterialId,
-          supplierId: _selectedSupplierId,
+          materialId: materialId,
+          supplierId: supplierId,
+          materialOther: materialOther,
+          supplierOther: supplierOther,
           qtyCf: qtyCf,
           customerName: _customerName.trim(),
         );
@@ -242,7 +277,7 @@ class _TripFormScreenState extends State<TripFormScreen> {
                         const Expanded(
                           child: Text('Material', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
-                        if (widget.selfAssignDriverId == null)
+                        if (widget.isOwner)
                           TextButton.icon(
                             onPressed: _addMaterial,
                             icon: const Icon(Icons.add, size: 18),
@@ -255,18 +290,31 @@ class _TripFormScreenState extends State<TripFormScreen> {
                       isExpanded: true,
                       decoration: const InputDecoration(border: OutlineInputBorder()),
                       hint: const Text('None'),
-                      items: _materials
-                          .map((m) => DropdownMenuItem<String>(value: m.id, child: Text(m.name)))
-                          .toList(),
+                      items: [
+                        ..._materials.map((m) => DropdownMenuItem<String>(value: m.id, child: Text(m.name))),
+                        const DropdownMenuItem<String>(value: _otherValue, child: Text('Other (type manually)')),
+                      ],
                       onChanged: (val) => setState(() => _selectedMaterialId = val),
                     ),
+                    if (_selectedMaterialId == _otherValue) ...[
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _materialOtherController,
+                        decoration: const InputDecoration(
+                          labelText: 'Material (typed)',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) =>
+                            (value == null || value.trim().isEmpty) ? 'Enter a material, or pick one from the list' : null,
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     Row(
                       children: [
                         const Expanded(
                           child: Text('Supplier', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
-                        if (widget.selfAssignDriverId == null)
+                        if (widget.isOwner)
                           TextButton.icon(
                             onPressed: _addSupplier,
                             icon: const Icon(Icons.add, size: 18),
@@ -279,11 +327,24 @@ class _TripFormScreenState extends State<TripFormScreen> {
                       isExpanded: true,
                       decoration: const InputDecoration(border: OutlineInputBorder()),
                       hint: const Text('None'),
-                      items: _suppliers
-                          .map((s) => DropdownMenuItem<String>(value: s.id, child: Text(s.name)))
-                          .toList(),
+                      items: [
+                        ..._suppliers.map((s) => DropdownMenuItem<String>(value: s.id, child: Text(s.name))),
+                        const DropdownMenuItem<String>(value: _otherValue, child: Text('Other (type manually)')),
+                      ],
                       onChanged: (val) => setState(() => _selectedSupplierId = val),
                     ),
+                    if (_selectedSupplierId == _otherValue) ...[
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _supplierOtherController,
+                        decoration: const InputDecoration(
+                          labelText: 'Supplier (typed)',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) =>
+                            (value == null || value.trim().isEmpty) ? 'Enter a supplier, or pick one from the list' : null,
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _qtyCfController,

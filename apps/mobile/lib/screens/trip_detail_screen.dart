@@ -3,6 +3,7 @@ import '../models/trip.dart';
 import '../services/api_service.dart';
 import '../widgets/slide_to_act.dart';
 import '../widgets/expenses_list_view.dart';
+import 'trip_form_screen.dart';
 
 class TripDetailScreen extends StatefulWidget {
   const TripDetailScreen({super.key, required this.apiService, required this.trip, this.isOnline = false});
@@ -33,23 +34,69 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   String _formatDate(DateTime date) =>
       '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
+  /// The only slide action now — straight to Delivered, no separate "start"
+  /// step. Still works from IN_TRANSIT too (a trip that already went through
+  /// the old two-step flow before this change), always landing on DELIVERED.
   Future<void> _handleTripAction() async {
-    final newStatus = _trip.status == 'ASSIGNED' ? 'IN_TRANSIT' : 'DELIVERED';
-
     try {
-      final updated = await widget.apiService.updateTripStatus(_trip.id, newStatus);
+      final updated = await widget.apiService.updateTripStatus(_trip.id, 'DELIVERED');
       if (!mounted) return;
       setState(() {
         _trip = updated;
         _changed = true;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Trip marked as $newStatus')),
+        const SnackBar(content: Text('Trip marked as DELIVERED')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
+  }
+
+  Future<void> _markFailed() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Mark as Failed?'),
+        content: const Text('This records the delivery as failed. This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Mark Failed'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final updated = await widget.apiService.updateTripStatus(_trip.id, 'FAILED');
+      if (!mounted) return;
+      setState(() {
+        _trip = updated;
+        _changed = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  Future<void> _editTrip() async {
+    final updated = await Navigator.push<Trip>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TripFormScreen(apiService: widget.apiService, existing: _trip, isOwner: false),
+      ),
+    );
+    if (updated == null) return;
+    setState(() {
+      _trip = updated;
+      _changed = true;
+    });
   }
 
   Future<void> _deleteTrip() async {
@@ -98,7 +145,6 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   Widget build(BuildContext context) {
     final canAct = _trip.status == 'ASSIGNED' || _trip.status == 'IN_TRANSIT';
     final canDelete = _trip.status == 'ASSIGNED';
-    final blockedOffline = _trip.status == 'ASSIGNED' && !widget.isOnline;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -109,6 +155,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
         appBar: AppBar(
           title: Text(_trip.displayTitle),
           actions: [
+            IconButton(icon: const Icon(Icons.edit), onPressed: _editTrip, tooltip: 'Edit Trip'),
             if (canDelete)
               IconButton(
                 icon: _isDeleting
@@ -165,36 +212,20 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                 top: false,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Center(
-                    child: blockedOffline
-                        ? Container(
-                            width: 300,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(30),
-                              border: Border.all(color: Colors.orange),
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.wifi_off, color: Colors.orange, size: 18),
-                                SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    'Go online to start this trip',
-                                    style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        : SlideToAct(
-                            label: _trip.status == 'ASSIGNED' ? 'Slide to Start Trip' : 'Slide to End Trip',
-                            thumbColor: _trip.status == 'ASSIGNED' ? Colors.green : Colors.red,
-                            onAct: _handleTripAction,
-                          ),
+                  child: Column(
+                    children: [
+                      SlideToAct(
+                        label: 'Slide to Deliver',
+                        thumbColor: Colors.green,
+                        onAct: _handleTripAction,
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: _markFailed,
+                        style: TextButton.styleFrom(foregroundColor: Colors.red),
+                        child: const Text('Mark as Failed'),
+                      ),
+                    ],
                   ),
                 ),
               ),

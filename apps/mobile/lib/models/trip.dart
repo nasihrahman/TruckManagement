@@ -26,8 +26,14 @@ class Trip {
   final List<TripExpenseEntry> expenses;
   final String? materialId;
   final String? materialName;
+  /// "Other": a one-off value typed for this trip only, never added to the
+  /// managed Material list. Kept separate from materialId/materialName (not
+  /// merged) so the Trip Form can tell, when editing, whether to show the
+  /// dropdown selection or the free-text field.
+  final String? materialOther;
   final String? supplierId;
   final String? supplierName;
+  final String? supplierOther;
   final double? qtyCf;
   final String? customerName;
 
@@ -43,18 +49,26 @@ class Trip {
     this.expenses = const [],
     this.materialId,
     this.materialName,
+    this.materialOther,
     this.supplierId,
     this.supplierName,
+    this.supplierOther,
     this.qtyCf,
     this.customerName,
   });
 
   double get expenseTotal => expenses.fold(0, (sum, e) => sum + e.amount);
 
+  /// The material to display, whichever source it came from.
+  String? get materialDisplay => materialName ?? materialOther;
+
+  /// The supplier to display, whichever source it came from.
+  String? get supplierDisplay => supplierName ?? supplierOther;
+
   /// Replaces the old Origin → Destination label: Supplier is where the
   /// material is picked up, Customer is where it's delivered.
   String get displayTitle {
-    final parts = [supplierName, customerName]
+    final parts = [supplierDisplay, customerName]
         .where((s) => s != null && s.trim().isNotEmpty)
         .toList();
     return parts.isEmpty ? 'Trip' : parts.join(' → ');
@@ -77,8 +91,10 @@ class Trip {
           : const [],
       materialId: json['materialId']?.toString(),
       materialName: (json['material'] as Map<String, dynamic>?)?['name']?.toString(),
+      materialOther: json['materialOther']?.toString(),
       supplierId: json['supplierId']?.toString(),
       supplierName: (json['supplier'] as Map<String, dynamic>?)?['name']?.toString(),
+      supplierOther: json['supplierOther']?.toString(),
       qtyCf: json['qtyCf'] != null ? double.tryParse(json['qtyCf'].toString()) : null,
       customerName: json['customerName']?.toString(),
     );

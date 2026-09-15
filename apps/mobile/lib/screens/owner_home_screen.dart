@@ -10,6 +10,7 @@ import 'truck_form_screen.dart';
 import 'materials_screen.dart';
 import 'suppliers_screen.dart';
 import 'hitachi_jobs_screen.dart';
+import 'daily_expenses_screen.dart';
 import '../widgets/confirm_logout.dart';
 
 class OwnerHomeScreen extends StatefulWidget {
@@ -97,6 +98,14 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
     );
   }
 
+  Future<void> _quickDailyExpenses() async {
+    Navigator.pop(context);
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => DailyExpensesScreen(apiService: widget.apiService, isOwner: true)),
+    );
+  }
+
   void _showQuickActions() {
     showModalBottomSheet(
       context: context,
@@ -137,6 +146,11 @@ class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
               leading: const Icon(Icons.construction),
               title: const Text('Log Hitachi Data'),
               onTap: _quickHitachiJobs,
+            ),
+            ListTile(
+              leading: const Icon(Icons.receipt_long),
+              title: const Text('Daily Expenses'),
+              onTap: _quickDailyExpenses,
             ),
           ],
         ),

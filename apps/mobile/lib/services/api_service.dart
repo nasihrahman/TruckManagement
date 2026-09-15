@@ -11,6 +11,7 @@ import '../models/owner.dart';
 import '../models/material.dart';
 import '../models/supplier.dart';
 import '../models/hitachi_job.dart';
+import '../models/daily_expense.dart';
 
 class ApiService {
   ApiService({required this.baseUrl});
@@ -230,6 +231,8 @@ class ApiService {
     DateTime? scheduledAt,
     String? materialId,
     String? supplierId,
+    String? materialOther,
+    String? supplierOther,
     double? qtyCf,
     String? customerName,
   }) async {
@@ -243,6 +246,8 @@ class ApiService {
           if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
           if (materialId != null) 'materialId': materialId,
           if (supplierId != null) 'supplierId': supplierId,
+          if (materialOther != null) 'materialOther': materialOther,
+          if (supplierOther != null) 'supplierOther': supplierOther,
           if (qtyCf != null) 'qtyCf': qtyCf,
           if (customerName != null && customerName.isNotEmpty) 'customerName': customerName,
         }),
@@ -262,6 +267,8 @@ class ApiService {
     DateTime? scheduledAt,
     String? materialId,
     String? supplierId,
+    String? materialOther,
+    String? supplierOther,
     double? qtyCf,
     String? customerName,
   }) async {
@@ -273,8 +280,14 @@ class ApiService {
           if (driverId != null) 'driverId': driverId,
           if (truckId != null) 'truckId': truckId,
           if (scheduledAt != null) 'scheduledAt': scheduledAt.toIso8601String(),
-          if (materialId != null) 'materialId': materialId,
-          if (supplierId != null) 'supplierId': supplierId,
+          // Sent unconditionally (even null) — the Trip Form's Material and
+          // Supplier fields each toggle between a managed pick and free-text
+          // "Other", and switching between them must actively clear
+          // whichever one is no longer selected, not just skip sending it.
+          'materialId': materialId,
+          'supplierId': supplierId,
+          'materialOther': materialOther,
+          'supplierOther': supplierOther,
           if (qtyCf != null) 'qtyCf': qtyCf,
           if (customerName != null) 'customerName': customerName,
         }),
@@ -351,6 +364,23 @@ class ApiService {
     }
   }
 
+  /// [ids] is the FULL list of the company's material ids in the new order —
+  /// a drag reorders the whole sequence, not one item in isolation.
+  Future<List<CargoMaterial>> reorderMaterials(List<String> ids) async {
+    final response = await _send(
+      (headers) => http.patch(
+        Uri.parse('$baseUrl/materials/reorder'),
+        headers: headers,
+        body: jsonEncode({'ids': ids}),
+      ),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Unable to reorder materials');
+    }
+    return (body as List).map((item) => CargoMaterial.fromJson(item as Map<String, dynamic>)).toList();
+  }
+
   Future<List<String>> fetchTripCustomerNames() async {
     final response = await _send(
       (headers) => http.get(Uri.parse('$baseUrl/trips/customer-names'), headers: headers),
@@ -402,6 +432,21 @@ class ApiService {
       final body = jsonDecode(response.body);
       throw Exception(body['message'] ?? 'Unable to delete supplier');
     }
+  }
+
+  Future<List<Supplier>> reorderSuppliers(List<String> ids) async {
+    final response = await _send(
+      (headers) => http.patch(
+        Uri.parse('$baseUrl/suppliers/reorder'),
+        headers: headers,
+        body: jsonEncode({'ids': ids}),
+      ),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Unable to reorder suppliers');
+    }
+    return (body as List).map((item) => Supplier.fromJson(item as Map<String, dynamic>)).toList();
   }
 
   Future<Uint8List> exportTripsByTruckExcel({String? period, DateTime? date}) async {
@@ -1001,5 +1046,79 @@ class ApiService {
       final body = jsonDecode(response.body);
       throw Exception(body['message'] ?? 'Failed to delete expense');
     }
+  }
+
+  /// A lump expense for a whole day, not tied to a specific trip. [driverId]
+  /// is only needed when an Owner is logging on a driver's behalf — a Driver
+  /// caller is always attributed to themselves server-side regardless.
+  Future<DailyExpense> createDailyExpense({
+    required DateTime date,
+    required ExpenseCategory category,
+    required double amount,
+    String? reason,
+    String? notes,
+    String? photoUrl,
+    String? driverId,
+  }) async {
+    final response = await _send(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/daily-expenses'),
+        headers: headers,
+        body: jsonEncode({
+          'date': date.toIso8601String(),
+          'category': expenseCategoryToJson(category),
+          'amount': amount,
+          if (reason != null && reason.isNotEmpty) 'reason': reason,
+          if (notes != null && notes.isNotEmpty) 'notes': notes,
+          if (photoUrl != null && photoUrl.isNotEmpty) 'photoUrl': photoUrl,
+          if (driverId != null) 'driverId': driverId,
+        }),
+      ),
+    );
+    final body = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(body['message'] ?? 'Failed to log daily expense');
+    }
+    return DailyExpense.fromJson(body);
+  }
+
+  Future<List<DailyExpense>> fetchDailyExpenses({String? period, DateTime? date}) async {
+    final query = {
+      if (period != null) 'period': period,
+      if (date != null) 'date': date.toIso8601String(),
+    };
+    final uri = Uri.parse('$baseUrl/daily-expenses').replace(queryParameters: query.isEmpty ? null : query);
+    final response = await _send((headers) => http.get(uri, headers: headers));
+    final data = jsonDecode(response.body);
+    if (response.statusCode >= 400) {
+      throw Exception(data['message'] ?? 'Unable to fetch daily expenses');
+    }
+    if (data is List) {
+      return data.map((item) => DailyExpense.fromJson(item as Map<String, dynamic>)).toList();
+    }
+    return [];
+  }
+
+  Future<void> deleteDailyExpense(String id) async {
+    final response = await _send(
+      (headers) => http.delete(Uri.parse('$baseUrl/daily-expenses/$id'), headers: headers),
+    );
+    if (response.statusCode >= 400) {
+      final body = jsonDecode(response.body);
+      throw Exception(body['message'] ?? 'Failed to delete daily expense');
+    }
+  }
+
+  Future<Uint8List> exportDailyExpenses({String? period, DateTime? date}) async {
+    final query = {
+      if (period != null) 'period': period,
+      if (date != null) 'date': date.toIso8601String(),
+    };
+    final uri = Uri.parse('$baseUrl/daily-expenses/export.xlsx').replace(queryParameters: query.isEmpty ? null : query);
+    final response = await _send((headers) => http.get(uri, headers: headers));
+    if (response.statusCode >= 400) {
+      throw Exception('Unable to export daily expenses');
+    }
+    return response.bodyBytes;
   }
 }

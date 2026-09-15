@@ -11,6 +11,7 @@ import '../widgets/app_brand_title.dart';
 import 'trip_detail_screen.dart';
 import 'trip_form_screen.dart';
 import 'hitachi_jobs_screen.dart';
+import 'daily_expenses_screen.dart';
 
 class DriverTripsScreen extends StatefulWidget {
   const DriverTripsScreen({super.key, required this.apiService});
@@ -118,7 +119,7 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
     final created = await Navigator.push<Trip>(
       context,
       MaterialPageRoute(
-        builder: (_) => TripFormScreen(apiService: widget.apiService, selfAssignDriverId: _myDriverId),
+        builder: (_) => TripFormScreen(apiService: widget.apiService, selfAssignDriverId: _myDriverId, isOwner: false),
       ),
     );
     if (created != null) _refreshTrips();
@@ -159,10 +160,17 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
     try {
       if (value) {
         final position = await _getCurrentPosition();
-        if (position == null && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permission is needed to go online')),
-          );
+        if (position == null) {
+          // Previously this only showed a message and continued anyway —
+          // the driver ended up "Online" server-side with a ping loop that
+          // could never actually succeed. Location access is required to go
+          // online at all now, not just a recommendation.
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Location access is required to go online. Please allow it and try again.')),
+            );
+          }
+          return;
         }
         await widget.apiService.goOnline();
         if (kIsWeb) {
@@ -211,6 +219,14 @@ class _DriverTripsScreenState extends State<DriverTripsScreen> {
             ),
             tooltip: 'Hitachi Jobs',
             icon: const Icon(Icons.construction),
+          ),
+          IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => DailyExpensesScreen(apiService: widget.apiService)),
+            ),
+            tooltip: 'Daily Expenses',
+            icon: const Icon(Icons.receipt_long),
           ),
           IconButton(
             onPressed: () {
