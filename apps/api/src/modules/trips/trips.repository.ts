@@ -28,12 +28,15 @@ export class TripsRepository {
     });
   }
 
-  async updateStatus(id: string, status: TripStatus): Promise<Trip> {
+  async updateStatus(id: string, status: TripStatus, options?: { backfillStartedAt?: boolean }): Promise<Trip> {
     const data: Prisma.TripUpdateInput = { status };
     if (status === 'IN_TRANSIT') {
       data.startedAt = new Date();
     } else if (status === 'DELIVERED' || status === 'FAILED') {
       data.completedAt = new Date();
+      if (options?.backfillStartedAt) {
+        data.startedAt = data.completedAt;
+      }
     }
     return this.prisma.trip.update({ where: { id }, data });
   }
@@ -63,8 +66,18 @@ export class TripsRepository {
     });
   }
 
+  /// ASSIGNED now counts as "active" for ping-tagging purposes, since the
+  /// slide-to-start step (and IN_TRANSIT along with it) was removed from the
+  /// driver flow — a trip goes straight from ASSIGNED to DELIVERED/FAILED.
+  /// If a driver somehow has more than one ASSIGNED trip at once there's no
+  /// way to know which one they're actually on, so this just picks the most
+  /// recently created — pings still work, they just may tag the "wrong" of
+  /// several simultaneously-assigned trips in that edge case.
   async findActiveTripForDriver(driverId: string): Promise<Trip | null> {
-    return this.prisma.trip.findFirst({ where: { driverId, status: 'IN_TRANSIT' } });
+    return this.prisma.trip.findFirst({
+      where: { driverId, status: { in: ['ASSIGNED', 'IN_TRANSIT'] } },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   /// Raw SQL rather than Prisma's `distinct`, which does NOT compile to SQL

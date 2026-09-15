@@ -13,6 +13,7 @@ import { MaterialsModule } from './modules/materials/materials.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { HitachiJobsModule } from './modules/hitachi-jobs/hitachi-jobs.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { DailyExpensesModule } from './modules/daily-expenses/daily-expenses.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     SuppliersModule,
     HitachiJobsModule,
     UploadsModule,
+    DailyExpensesModule,
   ],
 })
 export class AppModule {}

@@ -23,6 +23,18 @@ export class CreateTripDto {
   @IsString()
   supplierId?: string;
 
+  // "Other" escape hatch — a one-off value for this trip only, not added to
+  // the managed list. The form sends one of materialId/materialOther, never
+  // both; not enforced here since there's nothing unsafe about both being
+  // absent or the client clearing one by omission.
+  @IsOptional()
+  @IsString()
+  materialOther?: string;
+
+  @IsOptional()
+  @IsString()
+  supplierOther?: string;
+
   @IsOptional()
   @IsNumber()
   @IsPositive()

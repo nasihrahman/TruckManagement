@@ -190,7 +190,7 @@ export class ReportsService {
     for (const trip of trips) {
       tripsSheet.addRow({
         driver: driverName(trip.driver),
-        supplier: trip.supplier?.name ?? '',
+        supplier: trip.supplier?.name ?? trip.supplierOther ?? '',
         customerName: trip.customerName ?? '',
         truck: trip.truck ? [trip.truck.plate, trip.truck.brand].filter(Boolean).join(' · ') : 'Unassigned',
         status: trip.status,
@@ -217,7 +217,7 @@ export class ReportsService {
         date: expense.createdAt.toISOString().slice(0, 16).replace('T', ' '),
         driver: driverName(expense.driver),
         trip: expense.trip
-          ? [expense.trip.supplier?.name, expense.trip.customerName].filter(Boolean).join(' → ')
+          ? [expense.trip.supplier?.name ?? expense.trip.supplierOther, expense.trip.customerName].filter(Boolean).join(' → ')
           : '',
         category: expense.category,
         amount: Number(expense.amount),

@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { SuppliersService } from './suppliers.service';
 import { CreateSupplierDto, UpdateSupplierDto } from './dto/supplier.dto';
+import { ReorderSuppliersDto } from './dto/reorder-suppliers.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -21,6 +22,12 @@ export class SuppliersController {
   @Roles(Role.OWNER, Role.DRIVER)
   async findAll(@Request() req: any) {
     return this.suppliersService.findAll(req.user.companyId);
+  }
+
+  // Must come before @Patch(':id') — see MaterialsController for why.
+  @Patch('reorder')
+  async reorder(@Request() req: any, @Body() dto: ReorderSuppliersDto) {
+    return this.suppliersService.reorder(req.user.companyId, dto.ids);
   }
 
   @Patch(':id')

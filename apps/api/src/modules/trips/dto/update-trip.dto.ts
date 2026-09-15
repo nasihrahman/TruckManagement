@@ -24,6 +24,14 @@ export class UpdateTripDto {
   supplierId?: string;
 
   @IsOptional()
+  @IsString()
+  materialOther?: string;
+
+  @IsOptional()
+  @IsString()
+  supplierOther?: string;
+
+  @IsOptional()
   @IsNumber()
   @IsPositive()
   qtyCf?: number;

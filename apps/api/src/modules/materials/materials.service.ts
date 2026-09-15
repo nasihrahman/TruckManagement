@@ -46,4 +46,14 @@ export class MaterialsService {
     const material = await this.findOne(id, companyId);
     return this.materialsRepository.delete(material.id);
   }
+
+  async reorder(companyId: string, ids: string[]): Promise<Material[]> {
+    const existing = await this.materialsRepository.findAll(companyId);
+    const existingIds = new Set(existing.map((m) => m.id));
+    if (ids.length !== existing.length || !ids.every((id) => existingIds.has(id))) {
+      throw new BadRequestException('The id list must contain exactly the company\'s existing materials, once each');
+    }
+    await this.materialsRepository.reorder(companyId, ids);
+    return this.materialsRepository.findAll(companyId);
+  }
 }

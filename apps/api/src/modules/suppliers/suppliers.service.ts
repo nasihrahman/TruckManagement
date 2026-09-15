@@ -46,4 +46,14 @@ export class SuppliersService {
     const supplier = await this.findOne(id, companyId);
     return this.suppliersRepository.delete(supplier.id);
   }
+
+  async reorder(companyId: string, ids: string[]): Promise<Supplier[]> {
+    const existing = await this.suppliersRepository.findAll(companyId);
+    const existingIds = new Set(existing.map((s) => s.id));
+    if (ids.length !== existing.length || !ids.every((id) => existingIds.has(id))) {
+      throw new BadRequestException('The id list must contain exactly the company\'s existing suppliers, once each');
+    }
+    await this.suppliersRepository.reorder(companyId, ids);
+    return this.suppliersRepository.findAll(companyId);
+  }
 }

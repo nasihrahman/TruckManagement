@@ -40,19 +40,27 @@ export class TripsService {
 
   async update(
     id: string,
-    companyId: string,
+    user: { userId: string; role: string; companyId: string },
     data: {
       scheduledAt?: Date;
       truckId?: string;
       driverId?: string;
       materialId?: string;
       supplierId?: string;
+      materialOther?: string;
+      supplierOther?: string;
       qtyCf?: number;
       customerName?: string;
     },
   ) {
     const trip = await this.findById(id);
-    if (trip.companyId !== companyId) throw new ForbiddenException();
+    if (trip.companyId !== user.companyId) throw new ForbiddenException();
+
+    // Full edit access for Drivers, but only on their own trip (self-assigned
+    // or Owner-assigned) — never someone else's.
+    if (user.role === 'DRIVER' && trip.driverId !== user.userId) {
+      throw new ForbiddenException('Driver not assigned to this trip');
+    }
 
     return this.tripsRepository.update(id, data);
   }
@@ -65,18 +73,27 @@ export class TripsService {
       if (!trip.driverId || trip.driverId !== user.userId) throw new ForbiddenException('Driver not assigned to this trip');
     }
 
-    // Validate state transition
+    // Validate state transition. IN_TRANSIT is no longer reachable through
+    // any current UI (the "slide to start" step was removed — only "slide to
+    // deliver" remains), but the check still accepts it as a valid "from"
+    // state so historical trips already sitting in IN_TRANSIT can still be
+    // completed normally.
     if (status === 'IN_TRANSIT' && trip.status !== 'ASSIGNED') {
       throw new BadRequestException('Trip must be ASSIGNED before starting');
     }
-    if ((status === 'DELIVERED' || status === 'FAILED') && trip.status !== 'IN_TRANSIT') {
-      throw new BadRequestException('Trip must be IN_TRANSIT before completing');
+    if ((status === 'DELIVERED' || status === 'FAILED') && trip.status !== 'ASSIGNED' && trip.status !== 'IN_TRANSIT') {
+      throw new BadRequestException('Trip must be assigned before completing');
     }
     if (trip.status === status) {
       throw new BadRequestException(`Trip is already ${status}`);
     }
 
-    return this.tripsRepository.updateStatus(id, status);
+    // Most trips now go straight ASSIGNED -> DELIVERED/FAILED with no
+    // IN_TRANSIT step, so startedAt would otherwise stay null forever —
+    // back-fill it to the same moment as completedAt when that happens.
+    const backfillStartedAt = (status === 'DELIVERED' || status === 'FAILED') && !trip.startedAt;
+
+    return this.tripsRepository.updateStatus(id, status, { backfillStartedAt });
   }
 
   async remove(id: string, user: { userId: string; role: string; companyId: string }): Promise<void> {
@@ -141,7 +158,7 @@ export class TripsService {
 
       for (const trip of driverTrips) {
         sheet.addRow({
-          supplier: trip.supplier?.name ?? '',
+          supplier: trip.supplier?.name ?? trip.supplierOther ?? '',
           customerName: trip.customerName ?? '',
           truck: trip.truck ? [trip.truck.plate, trip.truck.brand].filter(Boolean).join(' · ') : 'Unassigned',
           scheduledAt: trip.scheduledAt ? trip.scheduledAt.toISOString().slice(0, 10) : '',
@@ -220,8 +237,8 @@ export class TripsService {
 
         sheet.addRow({
           scheduledAt: trip.scheduledAt ? trip.scheduledAt.toISOString().slice(0, 10) : '',
-          material: trip.material?.name ?? '',
-          supplier: trip.supplier?.name ?? '',
+          material: trip.material?.name ?? trip.materialOther ?? '',
+          supplier: trip.supplier?.name ?? trip.supplierOther ?? '',
           qtyCf: trip.qtyCf ? Number(trip.qtyCf) : '',
           customerName: trip.customerName ?? '',
           driver: trip.driver

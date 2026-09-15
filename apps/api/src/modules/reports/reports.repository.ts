@@ -39,6 +39,7 @@ export class ReportsRepository {
       where: { companyId, createdAt: { gte: start, lt: end } },
       select: {
         supplier: { select: { name: true } },
+        supplierOther: true,
         customerName: true,
         status: true,
         scheduledAt: true,
@@ -62,7 +63,7 @@ export class ReportsRepository {
         notes: true,
         createdAt: true,
         driver: { select: DRIVER_SELECT },
-        trip: { select: { supplier: { select: { name: true } }, customerName: true } },
+        trip: { select: { supplier: { select: { name: true } }, supplierOther: true, customerName: true } },
       },
       orderBy: { createdAt: 'asc' },
     });

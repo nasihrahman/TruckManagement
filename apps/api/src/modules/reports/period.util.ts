@@ -1,4 +1,4 @@
-export type ReportPeriod = 'weekly' | 'monthly' | 'quarterly';
+export type ReportPeriod = 'daily' | 'weekly' | 'monthly' | 'quarterly';
 
 export interface PeriodRange {
   start: Date;
@@ -13,6 +13,12 @@ export function resolvePeriodRange(period: ReportPeriod, anchor: Date): PeriodRa
   const day = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate()));
 
   switch (period) {
+    case 'daily': {
+      const start = day;
+      const end = new Date(day);
+      end.setUTCDate(day.getUTCDate() + 1);
+      return { start, end };
+    }
     case 'weekly': {
       const weekday = day.getUTCDay(); // 0=Sun..6=Sat
       const diffToMonday = (weekday + 6) % 7;

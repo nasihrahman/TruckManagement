@@ -25,6 +25,7 @@ model Company {
   materials    Material[]
   suppliers    Supplier[]
   hitachiJobs  HitachiJob[]
+  dailyExpenses DailyExpense[]
 }
 
 model User {
@@ -49,6 +50,7 @@ model User {
   locationPings           LocationPing[]
   expenses                Expense[]
   hitachiJobs             HitachiJob[]
+  dailyExpenses           DailyExpense[]
 }
 
 model DriverProfile {
@@ -83,6 +85,9 @@ model Material {
   company   Company  @relation(fields: [companyId], references: [id])
   companyId String
   name      String
+  /// Display order in dropdowns/lists, drag-to-reorder sets this — not
+  /// createdAt or name, which is why it's a separate column.
+  sortOrder Int      @default(0)
   createdAt DateTime @default(now())
   trips     Trip[]
 
@@ -94,6 +99,7 @@ model Supplier {
   company   Company  @relation(fields: [companyId], references: [id])
   companyId String
   name      String
+  sortOrder Int      @default(0)
   createdAt DateTime @default(now())
   trips     Trip[]
 
@@ -149,8 +155,14 @@ model Trip {
   createdAt     DateTime      @default(now())
   material      Material?     @relation(fields: [materialId], references: [id])
   materialId    String?
+  /// "Other" escape hatch: a one-off value for this trip only, never added to
+  /// the managed Material list. Mutually exclusive with materialId in
+  /// practice (the form offers one or the other) but not DB-enforced, since
+  /// enforcing it buys little and the form already can't set both.
+  materialOther String?
   supplier      Supplier?     @relation(fields: [supplierId], references: [id])
   supplierId    String?
+  supplierOther String?
   qtyCf         Decimal?      @db.Decimal(10,2)
   customerName  String?
   fuelReceipts  FuelReceipt[]
@@ -191,6 +203,26 @@ model Expense {
   odometer  Int?
   reason    String?
   notes     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+}
+
+/// A lump expense for a whole day, not tied to any single trip — most
+/// drivers don't want to split fuel/fines across individual deliveries, so
+/// this is a parallel, coarser logging path alongside per-trip Expense
+/// (Override 6's per-trip flow), not a replacement for it.
+model DailyExpense {
+  id        String          @id @default(cuid())
+  company   Company         @relation(fields: [companyId], references: [id])
+  companyId String
+  driver    User            @relation(fields: [driverId], references: [id])
+  driverId  String
+  date      DateTime
+  category  ExpenseCategory
+  amount    Decimal         @db.Decimal(10, 2)
+  reason    String?
+  notes     String?
+  photoUrl  String?
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 }

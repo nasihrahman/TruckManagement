@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { MaterialsService } from './materials.service';
 import { CreateMaterialDto, UpdateMaterialDto } from './dto/material.dto';
+import { ReorderMaterialsDto } from './dto/reorder-materials.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -21,6 +22,13 @@ export class MaterialsController {
   @Roles(Role.OWNER, Role.DRIVER)
   async findAll(@Request() req: any) {
     return this.materialsService.findAll(req.user.companyId);
+  }
+
+  // Must come before @Patch(':id') — otherwise Nest matches "reorder" as an
+  // :id and routes it into update() instead.
+  @Patch('reorder')
+  async reorder(@Request() req: any, @Body() dto: ReorderMaterialsDto) {
+    return this.materialsService.reorder(req.user.companyId, dto.ids);
   }
 
   @Patch(':id')

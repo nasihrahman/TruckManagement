@@ -43,8 +43,11 @@ export class DriversController {
     return this.driversService.getOnlineLocations(req.user.companyId);
   }
 
+  // Drivers can now edit any trip assigned to them, including reassigning
+  // the driver/truck — the Trip Form's driver dropdown needs this list, same
+  // reasoning Override 15 already opened GET /trucks to Role.DRIVER for.
   @Get()
-  @Roles(Role.OWNER)
+  @Roles(Role.OWNER, Role.DRIVER)
   async list(@Request() req: any) {
     return this.driversService.getDrivers(req.user.companyId);
   }

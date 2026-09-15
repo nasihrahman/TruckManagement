@@ -70,9 +70,9 @@ export class TripsController {
   }
 
   @Patch(':id')
-  @Roles(Role.OWNER)
+  @Roles(Role.OWNER, Role.DRIVER)
   async update(@Request() req: any, @Param('id') id: string, @Body() body: UpdateTripDto) {
-    return this.tripsService.update(id, req.user.companyId, body);
+    return this.tripsService.update(id, req.user, body);
   }
 
   @Patch(':id/status')
