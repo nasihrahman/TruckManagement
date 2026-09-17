@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { DailyExpense, Prisma } from '@prisma/client';
 
 const DRIVER_SELECT = { id: true, firstName: true, lastName: true };
+const TRUCK_SELECT = { id: true, plate: true, brand: true };
 
 type Page = { limit?: number; offset?: number };
 type Range = { start: Date; end: Date };
@@ -12,7 +13,10 @@ export class DailyExpensesRepository {
   constructor(private prisma: PrismaService) {}
 
   async create(data: Prisma.DailyExpenseUncheckedCreateInput): Promise<DailyExpense> {
-    return this.prisma.dailyExpense.create({ data, include: { driver: { select: DRIVER_SELECT } } });
+    return this.prisma.dailyExpense.create({
+      data,
+      include: { driver: { select: DRIVER_SELECT }, truck: { select: TRUCK_SELECT } },
+    });
   }
 
   async findById(id: string): Promise<DailyExpense | null> {
@@ -25,7 +29,7 @@ export class DailyExpensesRepository {
       orderBy: { date: 'desc' },
       ...(page?.limit !== undefined ? { take: page.limit } : {}),
       ...(page?.offset ? { skip: page.offset } : {}),
-      include: { driver: { select: DRIVER_SELECT } },
+      include: { driver: { select: DRIVER_SELECT }, truck: { select: TRUCK_SELECT } },
     });
   }
 
@@ -35,7 +39,7 @@ export class DailyExpensesRepository {
       orderBy: { date: 'desc' },
       ...(page?.limit !== undefined ? { take: page.limit } : {}),
       ...(page?.offset ? { skip: page.offset } : {}),
-      include: { driver: { select: DRIVER_SELECT } },
+      include: { driver: { select: DRIVER_SELECT }, truck: { select: TRUCK_SELECT } },
     });
   }
 
@@ -55,7 +59,7 @@ export class DailyExpensesRepository {
         ...(range ? { date: { gte: range.start, lt: range.end } } : {}),
       },
       orderBy: [{ date: 'asc' }, { driverId: 'asc' }],
-      include: { driver: { select: DRIVER_SELECT } },
+      include: { driver: { select: DRIVER_SELECT }, truck: { select: TRUCK_SELECT } },
     });
   }
 }

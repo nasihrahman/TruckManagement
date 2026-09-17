@@ -26,4 +26,8 @@ export class UpdateDailyExpenseDto {
   @IsOptional()
   @IsString()
   photoUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  truckId?: string;
 }

@@ -78,6 +78,7 @@ model Truck {
   trips          Trip[]
   defaultForDrivers User[]
   hitachiJobs    HitachiJob[]
+  dailyExpenses  DailyExpense[]
 }
 
 model Material {
@@ -217,6 +218,12 @@ model DailyExpense {
   companyId String
   driver    User            @relation(fields: [driverId], references: [id])
   driverId  String
+  /// Which truck the expense was actually incurred on — defaults to the
+  /// driver's assigned truck in the form but stays freely changeable, same
+  /// as Trip.truckId. Nullable: entries logged before this field existed, or
+  /// for a driver with no truck assigned, have no truck to group by.
+  truck     Truck?          @relation(fields: [truckId], references: [id])
+  truckId   String?
   date      DateTime
   category  ExpenseCategory
   amount    Decimal         @db.Decimal(10, 2)

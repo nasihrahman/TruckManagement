@@ -7,6 +7,8 @@ class DailyExpense {
   final String id;
   final String driverId;
   final String? driverName;
+  final String? truckId;
+  final String? truckPlate;
   final DateTime date;
   final ExpenseCategory category;
   final double amount;
@@ -18,6 +20,8 @@ class DailyExpense {
     required this.id,
     required this.driverId,
     this.driverName,
+    this.truckId,
+    this.truckPlate,
     required this.date,
     required this.category,
     required this.amount,
@@ -33,10 +37,13 @@ class DailyExpense {
         : [driver['firstName'], driver['lastName']]
             .where((p) => p != null && p.toString().trim().isNotEmpty)
             .join(' ');
+    final truck = json['truck'] as Map<String, dynamic>?;
     return DailyExpense(
       id: json['id']?.toString() ?? '',
       driverId: json['driverId']?.toString() ?? '',
       driverName: (name == null || name.isEmpty) ? null : name,
+      truckId: json['truckId']?.toString(),
+      truckPlate: truck?['plate']?.toString(),
       date: DateTime.tryParse(json['date']?.toString() ?? '') ?? DateTime.now(),
       category: expenseCategoryFromJson(json['category']?.toString()),
       amount: double.tryParse(json['amount']?.toString() ?? '') ?? 0,

@@ -1059,6 +1059,7 @@ class ApiService {
     String? notes,
     String? photoUrl,
     String? driverId,
+    String? truckId,
   }) async {
     final response = await _send(
       (headers) => http.post(
@@ -1072,6 +1073,7 @@ class ApiService {
           if (notes != null && notes.isNotEmpty) 'notes': notes,
           if (photoUrl != null && photoUrl.isNotEmpty) 'photoUrl': photoUrl,
           if (driverId != null) 'driverId': driverId,
+          if (truckId != null) 'truckId': truckId,
         }),
       ),
     );

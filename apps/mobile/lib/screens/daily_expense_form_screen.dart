@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/expense.dart';
 import '../models/driver.dart';
+import '../models/truck.dart';
 import '../services/api_service.dart';
 import '../widgets/photo_picker_field.dart';
 
@@ -25,9 +26,12 @@ class _DailyExpenseFormScreenState extends State<DailyExpenseFormScreen> {
   late final TextEditingController _notesController;
   String? _photoUrl;
   String? _selectedDriverId;
+  String? _selectedTruckId;
   List<Driver> _drivers = [];
+  List<Truck> _trucks = [];
   bool _isLoading = false;
   bool _isLoadingDrivers = false;
+  bool _isLoadingTrucks = false;
 
   @override
   void initState() {
@@ -35,7 +39,25 @@ class _DailyExpenseFormScreenState extends State<DailyExpenseFormScreen> {
     _amountController = TextEditingController();
     _reasonController = TextEditingController();
     _notesController = TextEditingController();
-    if (widget.isOwner) _loadDrivers();
+    _loadTrucks();
+    if (widget.isOwner) {
+      _loadDrivers();
+    } else {
+      _prefillOwnTruck();
+    }
+  }
+
+  /// Drivers get their own assigned truck pre-filled (still changeable) —
+  /// same default-truck convention as the Trip Form.
+  Future<void> _prefillOwnTruck() async {
+    try {
+      final profile = await widget.apiService.fetchMyDriverProfile();
+      if (!mounted) return;
+      final defaultTruckId = profile['defaultTruckId']?.toString();
+      if (defaultTruckId != null) setState(() => _selectedTruckId = defaultTruckId);
+    } catch (_) {
+      // Non-fatal: the truck field just stays empty if this fails.
+    }
   }
 
   @override
@@ -60,6 +82,32 @@ class _DailyExpenseFormScreenState extends State<DailyExpenseFormScreen> {
     }
   }
 
+  Future<void> _loadTrucks() async {
+    setState(() => _isLoadingTrucks = true);
+    try {
+      final trucks = await widget.apiService.fetchTrucks();
+      if (!mounted) return;
+      setState(() => _trucks = trucks);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _isLoadingTrucks = false);
+    }
+  }
+
+  /// Owner picking a driver pre-fills that driver's default truck (still
+  /// changeable) — same as the Trip Form's driver-picks-truck convention.
+  void _onDriverChanged(String? driverId) {
+    setState(() {
+      _selectedDriverId = driverId;
+      final matches = _drivers.where((d) => d.id == driverId);
+      if (matches.isNotEmpty && matches.first.defaultTruckId != null) {
+        _selectedTruckId = matches.first.defaultTruckId;
+      }
+    });
+  }
+
   bool _isSameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
 
   Future<void> _submit() async {
@@ -82,6 +130,7 @@ class _DailyExpenseFormScreenState extends State<DailyExpenseFormScreen> {
         notes: _notesController.text,
         photoUrl: _photoUrl,
         driverId: widget.isOwner ? _selectedDriverId : null,
+        truckId: _selectedTruckId,
       );
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -120,10 +169,25 @@ class _DailyExpenseFormScreenState extends State<DailyExpenseFormScreen> {
                         items: _drivers
                             .map((d) => DropdownMenuItem<String>(value: d.id, child: Text(d.name)))
                             .toList(),
-                        onChanged: (val) => setState(() => _selectedDriverId = val),
+                        onChanged: _onDriverChanged,
                       ),
                 const SizedBox(height: 20),
               ],
+              const Text('Truck', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              _isLoadingTrucks
+                  ? const Center(child: CircularProgressIndicator())
+                  : DropdownButtonFormField<String>(
+                      initialValue: _selectedTruckId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(border: OutlineInputBorder()),
+                      hint: const Text('Unassigned'),
+                      items: _trucks
+                          .map((t) => DropdownMenuItem<String>(value: t.id, child: Text(t.displayName)))
+                          .toList(),
+                      onChanged: (val) => setState(() => _selectedTruckId = val),
+                    ),
+              const SizedBox(height: 20),
               const Text('Date', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Wrap(

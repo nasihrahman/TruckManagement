@@ -210,6 +210,7 @@ class _DailyExpensesScreenState extends State<DailyExpensesScreen> {
                             [
                               _formatDate(entry.date),
                               if (widget.isOwner) entry.driverName ?? 'Driver',
+                              if (entry.truckPlate != null) entry.truckPlate,
                               if (entry.reason != null && entry.reason!.isNotEmpty) entry.reason,
                             ].join(' · '),
                           ),

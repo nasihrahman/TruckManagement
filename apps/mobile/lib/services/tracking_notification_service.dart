@@ -29,7 +29,12 @@ class TrackingNotificationService {
           _channelId,
           _channelName,
           description: 'Reminds you that your location is being tracked while Online',
-          importance: Importance.low,
+          // High (not low) so it can't be buried/muted by the OS or an OEM
+          // battery-saver skin — the driver must always see it while Online.
+          // The notification itself is already non-swipeable: it's owned by
+          // an active Android foreground service (BackgroundLocationService),
+          // and the OS forbids dismissing those regardless of importance.
+          importance: Importance.high,
         ));
     _initialized = true;
   }

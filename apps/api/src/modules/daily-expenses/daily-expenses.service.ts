@@ -33,6 +33,7 @@ export class DailyExpensesService {
     return this.repository.create({
       companyId: user.companyId,
       driverId,
+      truckId: dto.truckId,
       date: new Date(dto.date),
       category: dto.category,
       amount: dto.amount,
@@ -68,6 +69,7 @@ export class DailyExpensesService {
       reason: dto.reason,
       notes: dto.notes,
       photoUrl: dto.photoUrl,
+      truckId: dto.truckId,
     });
   }
 
@@ -76,13 +78,25 @@ export class DailyExpensesService {
     return this.repository.delete(id);
   }
 
+  /// One sheet per truck (mirrors trips.service.ts's exportByTruckToExcel —
+  /// same grouping/sheet-naming approach), since the client wants this
+  /// consolidated the same way as the per-truck trips export. Entries with
+  /// no truck (logged before this field existed, or a driver with none
+  /// assigned) land on an "Unassigned" sheet rather than being dropped.
   async exportToExcel(companyId: string, period?: ReportPeriod, dateStr?: string, driverId?: string): Promise<Buffer> {
     const range = period ? resolvePeriodRange(period, dateStr ? new Date(dateStr) : new Date()) : undefined;
     const entries = await this.repository.findForExport(companyId, driverId, range);
 
+    const groups = new Map<string, { name: string; entries: typeof entries }>();
+    for (const entry of entries) {
+      const key = entry.truck?.id ?? 'unassigned';
+      const name = entry.truck ? entry.truck.plate : 'Unassigned';
+      if (!groups.has(key)) groups.set(key, { name, entries: [] });
+      groups.get(key)!.entries.push(entry);
+    }
+
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Daily Expenses');
-    sheet.columns = [
+    const columns = [
       { header: 'Date', key: 'date', width: 14 },
       { header: 'Driver', key: 'driver', width: 22 },
       { header: 'Category', key: 'category', width: 12 },
@@ -90,23 +104,60 @@ export class DailyExpensesService {
       { header: 'Reason', key: 'reason', width: 24 },
       { header: 'Notes', key: 'notes', width: 24 },
     ];
-    sheet.getRow(1).font = { bold: true };
 
-    let total = 0;
-    for (const entry of entries) {
-      total += Number(entry.amount);
-      sheet.addRow({
-        date: entry.date.toISOString().slice(0, 10),
-        driver: driverName(entry.driver),
-        category: entry.category,
-        amount: Number(entry.amount),
-        reason: entry.reason ?? '',
-        notes: entry.notes ?? '',
-      });
+    // Added before the per-truck sheets so it lands as the first tab.
+    if (groups.size > 1) {
+      const summary = workbook.addWorksheet('Summary');
+      summary.columns = [
+        { header: 'Truck', key: 'truck', width: 22 },
+        { header: 'Total', key: 'total', width: 14 },
+      ];
+      summary.getRow(1).font = { bold: true };
+      let grandTotal = 0;
+      for (const { name, entries: truckEntries } of groups.values()) {
+        const truckTotal = truckEntries.reduce((sum, e) => sum + Number(e.amount), 0);
+        grandTotal += truckTotal;
+        summary.addRow({ truck: name, total: truckTotal });
+      }
+      summary.addRow({});
+      const grandTotalRow = summary.addRow({ truck: 'Grand Total', total: grandTotal });
+      grandTotalRow.font = { bold: true };
     }
-    sheet.addRow({});
-    const totalRow = sheet.addRow({ driver: 'Total', amount: total });
-    totalRow.font = { bold: true };
+
+    const usedNames = new Set<string>();
+    for (const { name, entries: truckEntries } of groups.values()) {
+      let sheetName = name.replace(/[*?:/\\[\]]/g, ' ').trim().slice(0, 31) || 'Truck';
+      let suffix = 2;
+      while (usedNames.has(sheetName)) {
+        sheetName = `${sheetName.slice(0, 28)} (${suffix++})`;
+      }
+      usedNames.add(sheetName);
+
+      const sheet = workbook.addWorksheet(sheetName);
+      sheet.columns = columns;
+      sheet.getRow(1).font = { bold: true };
+
+      let total = 0;
+      for (const entry of truckEntries) {
+        total += Number(entry.amount);
+        sheet.addRow({
+          date: entry.date.toISOString().slice(0, 10),
+          driver: driverName(entry.driver),
+          category: entry.category,
+          amount: Number(entry.amount),
+          reason: entry.reason ?? '',
+          notes: entry.notes ?? '',
+        });
+      }
+      sheet.addRow({});
+      const totalRow = sheet.addRow({ driver: 'Total', amount: total });
+      totalRow.font = { bold: true };
+    }
+
+    if (workbook.worksheets.length === 0) {
+      const sheet = workbook.addWorksheet('Daily Expenses');
+      sheet.columns = columns;
+    }
 
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);

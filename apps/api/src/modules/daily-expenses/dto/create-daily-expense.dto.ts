@@ -29,4 +29,8 @@ export class CreateDailyExpenseDto {
   @IsOptional()
   @IsString()
   driverId?: string;
+
+  @IsOptional()
+  @IsString()
+  truckId?: string;
 }
