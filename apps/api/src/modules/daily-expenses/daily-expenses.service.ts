@@ -78,6 +78,30 @@ export class DailyExpensesService {
     return this.repository.delete(id);
   }
 
+  /// Used by TripsService's per-truck export to match trips against the
+  /// lump daily totals a driver actually logs (Fuel/Fine/Other) — drivers
+  /// don't split fuel per trip, so this is the real expense signal, not the
+  /// per-trip Expense model. Keyed by truckId, 'unassigned' for entries with
+  /// no truck; the caller decides whether to render 'unassigned' or drop it.
+  async findTotalsByTruckInRange(
+    companyId: string,
+    range?: { start: Date; end: Date },
+  ): Promise<Map<string, { truckPlate: string; fuel: number; fine: number; other: number }>> {
+    const entries = await this.repository.findForExport(companyId, undefined, range);
+    const totals = new Map<string, { truckPlate: string; fuel: number; fine: number; other: number }>();
+    for (const entry of entries) {
+      const key = entry.truck?.id ?? 'unassigned';
+      const truckPlate = entry.truck?.plate ?? 'Unassigned';
+      if (!totals.has(key)) totals.set(key, { truckPlate, fuel: 0, fine: 0, other: 0 });
+      const bucket = totals.get(key)!;
+      const amount = Number(entry.amount);
+      if (entry.category === 'FUEL') bucket.fuel += amount;
+      else if (entry.category === 'FINE') bucket.fine += amount;
+      else bucket.other += amount;
+    }
+    return totals;
+  }
+
   /// One sheet per truck (mirrors trips.service.ts's exportByTruckToExcel —
   /// same grouping/sheet-naming approach), since the client wants this
   /// consolidated the same way as the per-truck trips export. Entries with

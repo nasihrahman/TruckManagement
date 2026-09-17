@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TripsService } from './trips.service';
 import { TripsRepository } from './trips.repository';
+import { DailyExpensesService } from '../daily-expenses/daily-expenses.service';
 
 describe('TripsService', () => {
   let service: TripsService;
@@ -13,11 +14,19 @@ describe('TripsService', () => {
     remove: jest.fn(),
     findByCompanyForTruckExport: jest.fn(),
   };
+  const dailyExpensesService = {
+    findTotalsByTruckInRange: jest.fn(),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    dailyExpensesService.findTotalsByTruckInRange.mockResolvedValue(new Map());
     const module: TestingModule = await Test.createTestingModule({
-      providers: [TripsService, { provide: TripsRepository, useValue: repo }],
+      providers: [
+        TripsService,
+        { provide: TripsRepository, useValue: repo },
+        { provide: DailyExpensesService, useValue: dailyExpensesService },
+      ],
     }).compile();
 
     service = module.get<TripsService>(TripsService);

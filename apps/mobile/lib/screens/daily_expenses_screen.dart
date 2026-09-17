@@ -20,6 +20,7 @@ class _DailyExpensesScreenState extends State<DailyExpensesScreen> {
   String? _driverFilterId;
   String _exportPeriod = 'daily';
   bool _isExporting = false;
+  bool _isExportingTrips = false;
 
   @override
   void initState() {
@@ -82,6 +83,24 @@ class _DailyExpensesScreenState extends State<DailyExpensesScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  /// Trips for the period, per truck, matched against that truck's logged
+  /// daily Fuel/Fine/Other totals — the combined report, since drivers log
+  /// one lump total per day rather than per-trip fuel amounts.
+  Future<void> _exportTripsByTruck() async {
+    setState(() => _isExportingTrips = true);
+    try {
+      final bytes = await widget.apiService.exportTripsByTruckExcel(period: _exportPeriod);
+      final saved = await downloadBytes(bytes, 'trips-by-truck-$_exportPeriod.xlsx');
+      if (!mounted || !saved) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export downloaded')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _isExportingTrips = false);
     }
   }
 
@@ -150,35 +169,48 @@ class _DailyExpensesScreenState extends State<DailyExpensesScreen> {
                   ),
                 ),
                 Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _exportPeriod,
+                    isDense: true,
+                    decoration: InputDecoration(
+                      labelText: 'Export period',
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'daily', child: Text('Today')),
+                      DropdownMenuItem(value: 'weekly', child: Text('This Week')),
+                      DropdownMenuItem(value: 'monthly', child: Text('This Month')),
+                      DropdownMenuItem(value: 'quarterly', child: Text('This Quarter')),
+                    ],
+                    onChanged: (val) => setState(() => _exportPeriod = val ?? 'daily'),
+                  ),
+                ),
+                Padding(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                   child: Row(
                     children: [
                       Expanded(
-                        child: DropdownButtonFormField<String>(
-                          initialValue: _exportPeriod,
-                          isDense: true,
-                          decoration: InputDecoration(
-                            labelText: 'Export period',
-                            isDense: true,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 'daily', child: Text('Today')),
-                            DropdownMenuItem(value: 'weekly', child: Text('This Week')),
-                            DropdownMenuItem(value: 'monthly', child: Text('This Month')),
-                            DropdownMenuItem(value: 'quarterly', child: Text('This Quarter')),
-                          ],
-                          onChanged: (val) => setState(() => _exportPeriod = val ?? 'daily'),
+                        child: OutlinedButton.icon(
+                          onPressed: _isExportingTrips ? null : _exportTripsByTruck,
+                          icon: _isExportingTrips
+                              ? const SizedBox(
+                                  width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.local_shipping_outlined, size: 18),
+                          label: const Text('Trips + Expenses by Truck'),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      FilledButton.icon(
-                        onPressed: _isExporting ? null : _export,
-                        icon: _isExporting
-                            ? const SizedBox(
-                                width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(Icons.file_download, size: 18),
-                        label: const Text('Export'),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _isExporting ? null : _export,
+                          icon: _isExporting
+                              ? const SizedBox(
+                                  width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.file_download, size: 18),
+                          label: const Text('Daily Expenses Only'),
+                        ),
                       ),
                     ],
                   ),

@@ -66,7 +66,6 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
   bool _isExportingDetail = false;
   bool _isExportingByTruck = false;
   bool _isExportingHitachi = false;
-  bool _isExportingDailyExpenses = false;
   late Future<Map<String, dynamic>> _reportFuture;
 
   static const _periodLabels = {
@@ -147,21 +146,6 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _isExportingByTruck = false);
-    }
-  }
-
-  Future<void> _exportDailyExpenses() async {
-    setState(() => _isExportingDailyExpenses = true);
-    try {
-      final bytes = await widget.apiService.exportDailyExpenses(period: _period, date: _anchorDate);
-      final saved = await downloadBytes(bytes, 'daily-expenses-by-truck-$_period.xlsx');
-      if (!mounted || !saved) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export downloaded')));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-    } finally {
-      if (mounted) setState(() => _isExportingDailyExpenses = false);
     }
   }
 
@@ -365,18 +349,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen> {
                           icon: _isExportingByTruck
                               ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                               : const Icon(Icons.local_shipping_outlined),
-                          label: const Text('Export by Truck (Fuel/Fine/Other)'),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _isExportingDailyExpenses ? null : _exportDailyExpenses,
-                          icon: _isExportingDailyExpenses
-                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                              : const Icon(Icons.receipt_long_outlined),
-                          label: const Text('Export Daily Expenses by Truck'),
+                          label: const Text('Export Trips + Expenses by Truck'),
                         ),
                       ),
                       const SizedBox(height: 8),

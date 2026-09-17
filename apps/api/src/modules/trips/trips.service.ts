@@ -3,10 +3,14 @@ import { TripsRepository } from './trips.repository';
 import { Trip, TripStatus, Prisma } from '@prisma/client';
 import * as ExcelJS from 'exceljs';
 import { ReportPeriod, resolvePeriodRange } from '../reports/period.util';
+import { DailyExpensesService } from '../daily-expenses/daily-expenses.service';
 
 @Injectable()
 export class TripsService {
-  constructor(private readonly tripsRepository: TripsRepository) {}
+  constructor(
+    private readonly tripsRepository: TripsRepository,
+    private readonly dailyExpensesService: DailyExpensesService,
+  ) {}
 
   async create(
     user: { userId: string; role: string; companyId: string },
@@ -178,9 +182,16 @@ export class TripsService {
     return Buffer.from(buffer);
   }
 
+  /// Per-truck sheet: trips for the period, then a footer matching that
+  /// truck's *daily* expense totals (Fuel/Fine/Other) for the same range —
+  /// the real expense signal, since drivers log one lump total per day
+  /// rather than splitting fuel/fines across individual trips. A truck with
+  /// daily expenses logged but no trips in range still gets a sheet (footer
+  /// only) so its totals aren't silently dropped.
   async exportByTruckToExcel(companyId: string, period?: ReportPeriod, dateStr?: string): Promise<Buffer> {
     const range = period ? resolvePeriodRange(period, dateStr ? new Date(dateStr) : new Date()) : undefined;
     const trips = await this.tripsRepository.findByCompanyForTruckExport(companyId, range);
+    const dailyTotals = await this.dailyExpensesService.findTotalsByTruckInRange(companyId, range);
 
     const groups = new Map<string, { name: string; trips: typeof trips }>();
     for (const trip of trips) {
@@ -188,6 +199,9 @@ export class TripsService {
       const name = trip.truck ? trip.truck.plate : 'Unassigned';
       if (!groups.has(key)) groups.set(key, { name, trips: [] });
       groups.get(key)!.trips.push(trip);
+    }
+    for (const [key, { truckPlate }] of dailyTotals) {
+      if (!groups.has(key)) groups.set(key, { name: truckPlate, trips: [] });
     }
 
     const workbook = new ExcelJS.Workbook();
@@ -208,7 +222,7 @@ export class TripsService {
     ];
 
     const usedNames = new Set<string>();
-    for (const { name, trips: truckTrips } of groups.values()) {
+    for (const [truckKey, { name, trips: truckTrips }] of groups.entries()) {
       let sheetName = name.replace(/[*?:/\\[\]]/g, ' ').trim().slice(0, 31) || 'Truck';
       let suffix = 2;
       while (usedNames.has(sheetName)) {
@@ -252,6 +266,21 @@ export class TripsService {
           expenseReasons,
           photoUrls,
         });
+      }
+
+      const dailyTotal = dailyTotals.get(truckKey);
+      if (dailyTotal) {
+        sheet.addRow({});
+        const headerRow = sheet.addRow({ scheduledAt: "Driver's Logged Daily Expenses" });
+        headerRow.font = { bold: true, italic: true };
+        sheet.addRow({ scheduledAt: 'Fuel', expenseTotal: dailyTotal.fuel });
+        sheet.addRow({ scheduledAt: 'Fine', expenseTotal: dailyTotal.fine });
+        sheet.addRow({ scheduledAt: 'Other', expenseTotal: dailyTotal.other });
+        const totalRow = sheet.addRow({
+          scheduledAt: 'Total',
+          expenseTotal: dailyTotal.fuel + dailyTotal.fine + dailyTotal.other,
+        });
+        totalRow.font = { bold: true };
       }
     }
 
