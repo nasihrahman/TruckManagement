@@ -15,12 +15,12 @@ describe('TripsService', () => {
     findByCompanyForTruckExport: jest.fn(),
   };
   const dailyExpensesService = {
-    findTotalsByTruckInRange: jest.fn(),
+    findEntriesByTruckInRange: jest.fn(),
   };
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    dailyExpensesService.findTotalsByTruckInRange.mockResolvedValue(new Map());
+    dailyExpensesService.findEntriesByTruckInRange.mockResolvedValue(new Map());
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TripsService,

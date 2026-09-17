@@ -191,7 +191,7 @@ export class TripsService {
   async exportByTruckToExcel(companyId: string, period?: ReportPeriod, dateStr?: string): Promise<Buffer> {
     const range = period ? resolvePeriodRange(period, dateStr ? new Date(dateStr) : new Date()) : undefined;
     const trips = await this.tripsRepository.findByCompanyForTruckExport(companyId, range);
-    const dailyTotals = await this.dailyExpensesService.findTotalsByTruckInRange(companyId, range);
+    const dailyByTruck = await this.dailyExpensesService.findEntriesByTruckInRange(companyId, range);
 
     const groups = new Map<string, { name: string; trips: typeof trips }>();
     for (const trip of trips) {
@@ -200,7 +200,7 @@ export class TripsService {
       if (!groups.has(key)) groups.set(key, { name, trips: [] });
       groups.get(key)!.trips.push(trip);
     }
-    for (const [key, { truckPlate }] of dailyTotals) {
+    for (const [key, { truckPlate }] of dailyByTruck) {
       if (!groups.has(key)) groups.set(key, { name: truckPlate, trips: [] });
     }
 
@@ -268,18 +268,39 @@ export class TripsService {
         });
       }
 
-      const dailyTotal = dailyTotals.get(truckKey);
-      if (dailyTotal) {
+      const daily = dailyByTruck.get(truckKey);
+      if (daily && daily.entries.length > 0) {
         sheet.addRow({});
         const headerRow = sheet.addRow({ scheduledAt: "Driver's Logged Daily Expenses" });
         headerRow.font = { bold: true, italic: true };
-        sheet.addRow({ scheduledAt: 'Fuel', expenseTotal: dailyTotal.fuel });
-        sheet.addRow({ scheduledAt: 'Fine', expenseTotal: dailyTotal.fine });
-        sheet.addRow({ scheduledAt: 'Other', expenseTotal: dailyTotal.other });
-        const totalRow = sheet.addRow({
-          scheduledAt: 'Total',
-          expenseTotal: dailyTotal.fuel + dailyTotal.fine + dailyTotal.other,
+        const colHeaderRow = sheet.addRow({
+          scheduledAt: 'Date',
+          material: 'Category',
+          expenseTotal: 'Amount',
+          expenseReasons: 'Reason',
         });
+        colHeaderRow.font = { bold: true };
+
+        let fuel = 0;
+        let fine = 0;
+        let other = 0;
+        for (const entry of daily.entries) {
+          if (entry.category === 'FUEL') fuel += entry.amount;
+          else if (entry.category === 'FINE') fine += entry.amount;
+          else other += entry.amount;
+          sheet.addRow({
+            scheduledAt: entry.date.toISOString().slice(0, 10),
+            material: entry.category,
+            expenseTotal: entry.amount,
+            expenseReasons: entry.reason ?? '',
+          });
+        }
+
+        sheet.addRow({});
+        sheet.addRow({ scheduledAt: 'Fuel Total', expenseTotal: fuel });
+        sheet.addRow({ scheduledAt: 'Fine Total', expenseTotal: fine });
+        sheet.addRow({ scheduledAt: 'Other Total', expenseTotal: other });
+        const totalRow = sheet.addRow({ scheduledAt: 'Grand Total', expenseTotal: fuel + fine + other });
         totalRow.font = { bold: true };
       }
     }

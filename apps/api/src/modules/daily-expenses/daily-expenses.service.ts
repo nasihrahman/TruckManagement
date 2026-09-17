@@ -79,27 +79,30 @@ export class DailyExpensesService {
   }
 
   /// Used by TripsService's per-truck export to match trips against the
-  /// lump daily totals a driver actually logs (Fuel/Fine/Other) — drivers
+  /// lump daily entries a driver actually logs (Fuel/Fine/Other) — drivers
   /// don't split fuel per trip, so this is the real expense signal, not the
   /// per-trip Expense model. Keyed by truckId, 'unassigned' for entries with
   /// no truck; the caller decides whether to render 'unassigned' or drop it.
-  async findTotalsByTruckInRange(
+  /// Returns line items (not just totals) so the export can show which date
+  /// each expense was logged on, not only a period total.
+  async findEntriesByTruckInRange(
     companyId: string,
     range?: { start: Date; end: Date },
-  ): Promise<Map<string, { truckPlate: string; fuel: number; fine: number; other: number }>> {
+  ): Promise<Map<string, { truckPlate: string; entries: { date: Date; category: string; amount: number; reason: string | null }[] }>> {
     const entries = await this.repository.findForExport(companyId, undefined, range);
-    const totals = new Map<string, { truckPlate: string; fuel: number; fine: number; other: number }>();
+    const byTruck = new Map<string, { truckPlate: string; entries: { date: Date; category: string; amount: number; reason: string | null }[] }>();
     for (const entry of entries) {
       const key = entry.truck?.id ?? 'unassigned';
       const truckPlate = entry.truck?.plate ?? 'Unassigned';
-      if (!totals.has(key)) totals.set(key, { truckPlate, fuel: 0, fine: 0, other: 0 });
-      const bucket = totals.get(key)!;
-      const amount = Number(entry.amount);
-      if (entry.category === 'FUEL') bucket.fuel += amount;
-      else if (entry.category === 'FINE') bucket.fine += amount;
-      else bucket.other += amount;
+      if (!byTruck.has(key)) byTruck.set(key, { truckPlate, entries: [] });
+      byTruck.get(key)!.entries.push({
+        date: entry.date,
+        category: entry.category,
+        amount: Number(entry.amount),
+        reason: entry.reason ?? entry.notes ?? null,
+      });
     }
-    return totals;
+    return byTruck;
   }
 
   /// One sheet per truck (mirrors trips.service.ts's exportByTruckToExcel —

@@ -18,6 +18,7 @@ class DailyExpensesScreen extends StatefulWidget {
 class _DailyExpensesScreenState extends State<DailyExpensesScreen> {
   late Future<List<DailyExpense>> _entriesFuture;
   String? _driverFilterId;
+  String? _viewPeriod;
   String _exportPeriod = 'daily';
   bool _isExporting = false;
   bool _isExportingTrips = false;
@@ -30,7 +31,7 @@ class _DailyExpensesScreenState extends State<DailyExpensesScreen> {
 
   void _refresh() {
     setState(() {
-      _entriesFuture = widget.apiService.fetchDailyExpenses();
+      _entriesFuture = widget.apiService.fetchDailyExpenses(period: _viewPeriod);
     });
   }
 
@@ -144,11 +145,11 @@ class _DailyExpensesScreenState extends State<DailyExpensesScreen> {
 
           return Column(
             children: [
-              if (widget.isOwner) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                  child: Row(
-                    children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                child: Row(
+                  children: [
+                    if (widget.isOwner) ...[
                       Expanded(
                         child: DropdownButtonFormField<String?>(
                           initialValue: selected,
@@ -165,9 +166,34 @@ class _DailyExpensesScreenState extends State<DailyExpensesScreen> {
                           onChanged: (val) => setState(() => _driverFilterId = val),
                         ),
                       ),
+                      const SizedBox(width: 8),
                     ],
-                  ),
+                    Expanded(
+                      child: DropdownButtonFormField<String?>(
+                        initialValue: _viewPeriod,
+                        isDense: true,
+                        decoration: InputDecoration(
+                          labelText: 'Show',
+                          isDense: true,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: null, child: Text('All time')),
+                          DropdownMenuItem(value: 'daily', child: Text('Today')),
+                          DropdownMenuItem(value: 'weekly', child: Text('This Week')),
+                          DropdownMenuItem(value: 'monthly', child: Text('This Month')),
+                          DropdownMenuItem(value: 'quarterly', child: Text('This Quarter')),
+                        ],
+                        onChanged: (val) {
+                          setState(() => _viewPeriod = val);
+                          _refresh();
+                        },
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              if (widget.isOwner) ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
                   child: DropdownButtonFormField<String>(
