@@ -88,9 +88,17 @@ export class DailyExpensesService {
   async findEntriesByTruckInRange(
     companyId: string,
     range?: { start: Date; end: Date },
-  ): Promise<Map<string, { truckPlate: string; entries: { date: Date; category: string; amount: number; reason: string | null }[] }>> {
+  ): Promise<
+    Map<
+      string,
+      { truckPlate: string; entries: { date: Date; category: string; amount: number; reason: string | null; photoUrl: string | null }[] }
+    >
+  > {
     const entries = await this.repository.findForExport(companyId, undefined, range);
-    const byTruck = new Map<string, { truckPlate: string; entries: { date: Date; category: string; amount: number; reason: string | null }[] }>();
+    const byTruck = new Map<
+      string,
+      { truckPlate: string; entries: { date: Date; category: string; amount: number; reason: string | null; photoUrl: string | null }[] }
+    >();
     for (const entry of entries) {
       const key = entry.truck?.id ?? 'unassigned';
       const truckPlate = entry.truck?.plate ?? 'Unassigned';
@@ -100,6 +108,7 @@ export class DailyExpensesService {
         category: entry.category,
         amount: Number(entry.amount),
         reason: entry.reason ?? entry.notes ?? null,
+        photoUrl: entry.photoUrl ?? null,
       });
     }
     return byTruck;
@@ -130,6 +139,7 @@ export class DailyExpensesService {
       { header: 'Amount', key: 'amount', width: 12 },
       { header: 'Reason', key: 'reason', width: 24 },
       { header: 'Notes', key: 'notes', width: 24 },
+      { header: 'Photo URL', key: 'photoUrl', width: 40 },
     ];
 
     // Added before the per-truck sheets so it lands as the first tab.
@@ -174,6 +184,7 @@ export class DailyExpensesService {
           amount: Number(entry.amount),
           reason: entry.reason ?? '',
           notes: entry.notes ?? '',
+          photoUrl: entry.photoUrl ?? '',
         });
       }
       sheet.addRow({});

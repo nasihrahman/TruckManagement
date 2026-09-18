@@ -105,6 +105,34 @@ class _DailyExpensesScreenState extends State<DailyExpensesScreen> {
     }
   }
 
+  Future<void> _viewPhoto(String url) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              child: Image.network(
+                url,
+                errorBuilder: (context, error, stackTrace) => const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Icon(Icons.broken_image_outlined, size: 48),
+                ),
+              ),
+            ),
+            IconButton.filled(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(context),
+              style: IconButton.styleFrom(backgroundColor: Colors.black54),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   String _formatDate(DateTime date) =>
       '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
@@ -272,10 +300,35 @@ class _DailyExpensesScreenState extends State<DailyExpensesScreen> {
                               if (entry.reason != null && entry.reason!.isNotEmpty) entry.reason,
                             ].join(' · '),
                           ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            tooltip: 'Delete',
-                            onPressed: () => _deleteExpense(entry),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (entry.photoUrl != null && entry.photoUrl!.isNotEmpty)
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(6),
+                                  onTap: () => _viewPhoto(entry.photoUrl!),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Image.network(
+                                      entry.photoUrl!,
+                                      width: 40,
+                                      height: 40,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => Container(
+                                        width: 40,
+                                        height: 40,
+                                        color: Colors.grey.shade200,
+                                        child: const Icon(Icons.broken_image_outlined, size: 18),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                tooltip: 'Delete',
+                                onPressed: () => _deleteExpense(entry),
+                              ),
+                            ],
                           ),
                         ),
                       );

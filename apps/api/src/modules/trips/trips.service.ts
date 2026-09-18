@@ -278,6 +278,7 @@ export class TripsService {
           material: 'Category',
           expenseTotal: 'Amount',
           expenseReasons: 'Reason',
+          photoUrls: 'Photo URL',
         });
         colHeaderRow.font = { bold: true };
 
@@ -293,6 +294,7 @@ export class TripsService {
             material: entry.category,
             expenseTotal: entry.amount,
             expenseReasons: entry.reason ?? '',
+            photoUrls: entry.photoUrl ?? '',
           });
         }
 
